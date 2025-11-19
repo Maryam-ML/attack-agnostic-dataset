@@ -8,6 +8,12 @@ from typing import Callable, Dict, List, Optional, Union
 import torch
 import yaml
 
+import sys
+import os
+
+# Add the 'dfadetect' directory to the system path
+sys.path.append('/kaggle/working/LCNN-and-GMM/dfadetect')
+
 from dfadetect.agnostic_datasets.attack_agnostic_dataset import AttackAgnosticDataset
 from dfadetect.cnn_features import CNNFeaturesSetting
 from dfadetect.datasets import apply_feature_and_double_delta, lfcc, mfcc
