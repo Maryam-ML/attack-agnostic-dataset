@@ -238,7 +238,8 @@ def main(args):
             cnn_features_setting = CNNFeaturesSetting()
 
         train_nn(
-            datasets_paths=[args.asv_path, args.wavefake_path, args.celeb_path],
+            #datasets_paths=[args.asv_path, args.wavefake_path, args.celeb_path],
+            datasets_paths=[args.asv_path ],
             device=device,
             amount_to_use=args.amount,
             batch_size=args.batch_size,
