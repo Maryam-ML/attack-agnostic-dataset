@@ -6,7 +6,7 @@ import soundfile as sf
 import torchaudio
 from torch.utils.data import Dataset
 #from torch.utils.data.dataset import T_co
-from torch.utils.data.dataset import _T_co as T_co
+#from torch.utils.data.dataset import _T_co as T_co
 
 from dfadetect.datasets import AudioDataset, PadDataset
 
