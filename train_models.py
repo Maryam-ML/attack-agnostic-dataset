@@ -8,7 +8,7 @@ from typing import Callable, Dict, List, Optional, Union
 import torch
 import yaml
 
-from .dfadetect.agnostic_datasets.attack_agnostic_dataset import AttackAgnosticDataset
+from dfadetect.agnostic_datasets.attack_agnostic_dataset import AttackAgnosticDataset
 from dfadetect.cnn_features import CNNFeaturesSetting
 from dfadetect.datasets import apply_feature_and_double_delta, lfcc, mfcc
 from dfadetect.models import models
