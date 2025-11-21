@@ -164,8 +164,8 @@ def evaluate_nn(
         logging_prefix = f"fold_{fold}"
         data_val = AttackAgnosticDataset(
             asvspoof_path=datasets_paths[0],
-            wavefake_path=datasets_paths[1],
-            fakeavceleb_path=datasets_paths[2],
+            #wavefake_path=datasets_paths[1],
+            #fakeavceleb_path=datasets_paths[2],
             fold_num=fold,
             fold_subset="val",
             reduced_number=amount_to_use,
@@ -261,8 +261,8 @@ def evaluate_gmm(
         for fold in [0, 1, 2]:
             real_dataset_test = AttackAgnosticDataset(
                 asvspoof_path=datasets_paths[0],
-                wavefake_path=datasets_paths[1],
-                fakeavceleb_path=datasets_paths[2],
+                #wavefake_path=datasets_paths[1],
+                #fakeavceleb_path=datasets_paths[2],
                 fold_num=fold,
                 fold_subset=subtype,
                 oversample=False,
@@ -274,8 +274,8 @@ def evaluate_gmm(
 
             fake_dataset_test = AttackAgnosticDataset(
                 asvspoof_path=datasets_paths[0],
-                wavefake_path=datasets_paths[1],
-                fakeavceleb_path=datasets_paths[2],
+                #wavefake_path=datasets_paths[1],
+                #fakeavceleb_path=datasets_paths[2],
                 fold_num=fold,
                 fold_subset=subtype,
                 oversample=False,
@@ -369,7 +369,7 @@ def main(args):
         evaluate_gmm(
             real_model_path=args.ckpt,
             fake_model_path=args.ckpt,
-            datasets_paths=[args.asv_path, args.wavefake_path, args.celeb_path],
+            datasets_paths=[args.asv_path],
             feature_fn=lfcc if args.lfcc else mfcc,
             feature_kwargs=feature_kwargs(lfcc=args.lfcc),
             clusters=args.clusters,
@@ -386,18 +386,14 @@ def parse_args():
 
     # If assigned as None, then it won't be taken into account
     ASVSPOOF_DATASET_PATH = "../datasets/ASVspoof2021/LA"
-    WAVEFAKE_DATASET_PATH = "../datasets/WaveFake"
-    FAKEAVCELEB_DATASET_PATH = "../datasets/FakeAVCeleb/FakeAVCeleb_v1.2"
+    #WAVEFAKE_DATASET_PATH = "../datasets/WaveFake"
+    #FAKEAVCELEB_DATASET_PATH = "../datasets/FakeAVCeleb/FakeAVCeleb_v1.2"
 
     parser.add_argument(
         "--asv_path", type=str, default=ASVSPOOF_DATASET_PATH
     )
-    parser.add_argument(
-        "--wavefake_path", type=str, default=WAVEFAKE_DATASET_PATH
-    )
-    parser.add_argument(
-        "--celeb_path", type=str, default=FAKEAVCELEB_DATASET_PATH
-    )
+    #parser.add_argument("--wavefake_path", type=str, default=WAVEFAKE_DATASET_PATH)
+    #parser.add_argument("--celeb_path", type=str, default=FAKEAVCELEB_DATASET_PATH)
 
     default_model_config = "config.yaml"
     parser.add_argument(
