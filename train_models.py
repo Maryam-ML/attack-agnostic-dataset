@@ -77,6 +77,7 @@ def train_nn(
         use_cnn_features=use_cnn_features,
     )
     timestamp = time.time()
+    print("timestamp", timestamp)
     folds_number = 3
 
     for fold in range(folds_number):
