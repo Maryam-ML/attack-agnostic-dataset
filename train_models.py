@@ -66,7 +66,10 @@ def train_nn(
 
     LOGGER.info("Loading data...")
     model_name, model_parameters = model_config["name"], model_config["parameters"]
+    print("the name of model", model_name)
+    print("model parameter", model_parameters)
     optimizer_config = model_config["optimizer"]
+    print("model optimizer", optimizer_config)
 
     use_cnn_features = False if model_name == "rawnet" else True
 
