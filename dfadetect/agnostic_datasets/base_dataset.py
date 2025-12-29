@@ -11,7 +11,7 @@ from typing import Any
 
 from dfadetect.datasets import AudioDataset, PadDataset
 
-WAVE_FAKE_INTERFACE = True
+WAVE_FAKE_INTERFACE = False
 WAVE_FAKE_SR = 16_000
 WAVE_FAKE_TRIM = True
 WAVE_FAKE_NORMALIZE = True
