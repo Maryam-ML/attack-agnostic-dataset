@@ -281,7 +281,7 @@ def load_directory_split_train_test(
         test_size: float,
         use_double_delta: bool = True,
         phone_call: bool = False,
-        pad: bool = False,
+        pad: bool = True,
         label: Optional[int] = None,
         amount_to_use: Optional[int] = None,
 ) -> Tuple[TransformDataset, TransformDataset]:
