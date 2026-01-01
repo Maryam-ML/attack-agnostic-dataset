@@ -71,7 +71,7 @@ class AudioDataset(torch.utils.data.Dataset):
         path = self._paths[index]
 
         waveform, sample_rate = torchaudio.load(path, normalize=self.normalize)
-
+ 
         if sample_rate != self.sample_rate:
             waveform, sample_rate = self.resample(path, self.sample_rate, self.normalize)
 
