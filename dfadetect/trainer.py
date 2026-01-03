@@ -27,6 +27,8 @@ class NNDataSetting:
 # 🔴 FIX: Padding function for variable length audio
 # =========================
 def pad_collate_fn(batch):
+    print("!!! PADDING FUNCTION IS RUNNING !!!") # Add this
+    import sys; sys.exit("Force Stop to check if padding runs") # Add this
     """
     Pads variable-length audio tensors inside a batch so they can be stacked.
     """
