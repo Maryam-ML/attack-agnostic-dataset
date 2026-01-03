@@ -21,42 +21,34 @@ LOGGER = logging.getLogger(__name__)
 @dataclass
 class NNDataSetting:
     use_cnn_features: bool
-
-
-# =========================
-# 🔴 FIX: Padding function for variable length audio
+#=========================
+# Padding collate function (CRITICAL FIX)
 # =========================
 def pad_collate_fn(batch):
-    print("!!! PADDING FUNCTION IS RUNNING !!!") # Add this
-    import sys; sys.exit("Force Stop to check if padding runs") # Add this
-    """
-    Pads variable-length audio tensors inside a batch so they can be stacked.
-    """
-    # Unpack the batch (audio, metadata, label)
     batch_x, batch_meta, batch_y = zip(*batch)
 
-    # Find the maximum length in this specific batch
+    # Find max length
     max_len = max(x.shape[-1] for x in batch_x)
 
-    # Pad each tensor with zeros to match max_len
     padded_x = []
     for x in batch_x:
+        # Ensure x is at least 2D (Channels, Length)
+        if x.dim() == 1:
+            x = x.unsqueeze(0)
+            
         pad_amount = max_len - x.shape[-1]
-        # F.pad takes (padding_left, padding_right) for the last dimension
         padded_x.append(F.pad(x, (0, pad_amount)))
 
-    # Convert labels to a single tensor
+    # Use torch.stack on the padded list
+    stacked_x = torch.stack(padded_x)
+    
+    # Convert labels
     if isinstance(batch_y[0], torch.Tensor):
         batch_y_tensor = torch.stack(batch_y)
     else:
         batch_y_tensor = torch.tensor(batch_y)
 
-    return (
-        torch.stack(padded_x),
-        batch_meta,
-        batch_y_tensor,
-    )
-
+    return stacked_x, batch_meta, batch_y_tensor
 
 # =========================
 # Base Trainer
