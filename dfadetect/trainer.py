@@ -24,6 +24,39 @@ class NNDataSetting:
 
 
 # =========================
+# 🔴 FIX: Padding function for variable length audio
+# =========================
+def pad_collate_fn(batch):
+    """
+    Pads variable-length audio tensors inside a batch so they can be stacked.
+    """
+    # Unpack the batch (audio, metadata, label)
+    batch_x, batch_meta, batch_y = zip(*batch)
+
+    # Find the maximum length in this specific batch
+    max_len = max(x.shape[-1] for x in batch_x)
+
+    # Pad each tensor with zeros to match max_len
+    padded_x = []
+    for x in batch_x:
+        pad_amount = max_len - x.shape[-1]
+        # F.pad takes (padding_left, padding_right) for the last dimension
+        padded_x.append(F.pad(x, (0, pad_amount)))
+
+    # Convert labels to a single tensor
+    if isinstance(batch_y[0], torch.Tensor):
+        batch_y_tensor = torch.stack(batch_y)
+    else:
+        batch_y_tensor = torch.tensor(batch_y)
+
+    return (
+        torch.stack(padded_x),
+        batch_meta,
+        batch_y_tensor,
+    )
+
+
+# =========================
 # Base Trainer
 # =========================
 class Trainer:
@@ -46,7 +79,7 @@ class Trainer:
 
 
 # =========================
-# GMM Trainer (unchanged)
+# GMM Trainer
 # =========================
 class GMMTrainer(Trainer):
 
@@ -65,6 +98,7 @@ class GMMTrainer(Trainer):
         train_len = len(dataset) - test_len
         train, test = torch.utils.data.random_split(dataset, [train_len, test_len])
 
+        # GMM usually processes files one by one (batch_size=1)
         train_loader = DataLoader(train, batch_size=1, shuffle=True)
         test_loader = DataLoader(test, batch_size=1)
 
@@ -125,28 +159,6 @@ def forward_and_loss(model, criterion, batch_x, batch_y, **kwargs):
 
 
 # =========================
-# 🔴 IMPORTANT FIX: padding
-# =========================
-def pad_collate_fn(batch):
-    """
-    Pads variable-length audio tensors inside a batch.
-    """
-    batch_x, batch_meta, batch_y = zip(*batch)
-
-    max_len = max(x.shape[-1] for x in batch_x)
-    batch_x = [
-        F.pad(x, (0, max_len - x.shape[-1]))
-        for x in batch_x
-    ]
-
-    return (
-        torch.stack(batch_x),
-        batch_meta,
-        torch.stack(batch_y),
-    )
-
-
-# =========================
 # Gradient Descent Trainer
 # =========================
 class GDTrainer(Trainer):
@@ -162,23 +174,25 @@ class GDTrainer(Trainer):
         logging_prefix: str = "",
         pos_weight: Optional[torch.FloatTensor] = None,
     ):
+        model = model.to(self.device) # Ensure model is on the correct device
 
         if test_dataset is not None:
             train = dataset
             test = test_dataset
         else:
-            test_len = int(len(dataset) * test_len)
-            train_len = len(dataset) - test_len
+            test_len_count = int(len(dataset) * test_len)
+            train_len = len(dataset) - test_len_count
             train, test = torch.utils.data.random_split(
-                dataset, [train_len, test_len]
+                dataset, [train_len, test_len_count]
             )
 
+        # 🔴 Updated DataLoader with collate_fn and corrected num_workers
         train_loader = DataLoader(
             train,
             batch_size=self.batch_size,
             shuffle=True,
             drop_last=True,
-            num_workers=2,
+            num_workers=4,  # Optimized for your system
             collate_fn=pad_collate_fn,
         )
 
@@ -186,7 +200,7 @@ class GDTrainer(Trainer):
             test,
             batch_size=self.batch_size,
             drop_last=True,
-            num_workers=2,
+            num_workers=4,
             collate_fn=pad_collate_fn,
         )
 
@@ -219,7 +233,11 @@ class GDTrainer(Trainer):
                         cnn_features_setting=cnn_features_setting,
                     )
 
-                batch_y = batch_y.unsqueeze(1).float().to(self.device)
+                # Ensure batch_y is the right shape [batch_size, 1]
+                if batch_y.dim() == 1:
+                    batch_y = batch_y.unsqueeze(1)
+                
+                batch_y = batch_y.float().to(self.device)
 
                 batch_out, batch_loss = forward_and_loss(
                     model, criterion, batch_x, batch_y
@@ -246,13 +264,13 @@ class GDTrainer(Trainer):
             # -------- Evaluation --------
             model.eval()
             test_loss = 0.0
-            num_correct = 0.0
-            num_total = 0.0
+            num_correct_test = 0.0
+            num_total_test = 0.0
 
             with torch.no_grad():
                 for batch_x, _, batch_y in test_loader:
                     batch_size = batch_x.size(0)
-                    num_total += batch_size
+                    num_total_test += batch_size
 
                     batch_x = batch_x.to(self.device)
 
@@ -262,17 +280,20 @@ class GDTrainer(Trainer):
                             cnn_features_setting=cnn_features_setting,
                         )
 
-                    batch_y = batch_y.unsqueeze(1).float().to(self.device)
+                    if batch_y.dim() == 1:
+                        batch_y = batch_y.unsqueeze(1)
+                    
+                    batch_y = batch_y.float().to(self.device)
 
                     batch_out = model(batch_x)
                     loss = criterion(batch_out, batch_y)
 
                     test_loss += loss.item() * batch_size
                     batch_pred = (torch.sigmoid(batch_out) > 0.5).int()
-                    num_correct += (batch_pred == batch_y.int()).sum().item()
+                    num_correct_test += (batch_pred == batch_y.int()).sum().item()
 
-            test_loss /= max(num_total, 1)
-            test_acc = 100 * num_correct / max(num_total, 1)
+            test_loss /= max(num_total_test, 1)
+            test_acc = 100 * num_correct_test / max(num_total_test, 1)
 
             LOGGER.info(
                 f"Epoch [{epoch+1}/{self.epochs}]: "
