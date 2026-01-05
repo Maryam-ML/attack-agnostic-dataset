@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
-import matplotlib
+import matplotlib #this is the library import
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
