@@ -33,7 +33,7 @@ FAKEAVCELEB_KFOLD_SPLIT = {
 class FakeAVCelebDataset(SimpleAudioFakeDataset):
 
     audio_folder = "FakeAVCeleb-audio"
-    audio_extension = ".mp3"
+    audio_extension = ".flac"
     metadata_file = Path(audio_folder) / "meta_data.csv"
     subsets = ("train", "dev", "eval")
 
