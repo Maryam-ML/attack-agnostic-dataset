@@ -69,7 +69,7 @@ def pad_collate_fn(batch):
             # "spoof" or "fake" -> 1, "bonafide" or "real" -> 0
             if y.lower() in ['spoof', 'fake']:
                 label_list.append(1)
-            elif y.lower() in ['bonafide', 'real']:
+            elif y.lower() in ['bonafide', 'real', '-']:
                 label_list.append(0)
             else:
                 raise ValueError(f"Unknown label: {y}")
