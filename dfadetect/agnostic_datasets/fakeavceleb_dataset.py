@@ -51,8 +51,83 @@ class FakeAVCelebDataset(SimpleAudioFakeDataset):
         self.samples = pd.concat([self.get_fake_samples(), self.get_real_samples()], ignore_index=True)
 
     def get_metadata(self):
-        md = pd.read_csv(Path(self.path) / self.metadata_file)
-        md["audio_type"] = md["type"].apply(lambda x: x.split("-")[-1])
+        """Generate metadata by scanning audio directories"""
+        
+        # Try to read existing metadata file first
+        metadata_path = Path(self.path) / self.metadata_file
+        if metadata_path.exists():
+            md = pd.read_csv(metadata_path)
+            md["audio_type"] = md["type"].apply(lambda x: x.split("-")[-1])
+            return md
+        
+        # If metadata doesn't exist, generate it from folder structure
+        print(f"Metadata file not found. Generating from directory structure...")
+        
+        records = []
+        base_path = Path(self.path)
+        
+        # Map folder names to method and type
+        folder_mapping = {
+            'FakeVideo-FakeAudio': {'method': 'unknown', 'type': 'FakeVideo-FakeAudio', 'audio_type': 'FakeAudio'},
+            'FakeVideo-RealAudio': {'method': 'real', 'type': 'FakeVideo-RealAudio', 'audio_type': 'RealAudio'},
+            'RealVideo-FakeAudio': {'method': 'unknown', 'type': 'RealVideo-FakeAudio', 'audio_type': 'FakeAudio'},
+            'RealVideo-RealAudio': {'method': 'real', 'type': 'RealVideo-RealAudio', 'audio_type': 'RealAudio'}
+        }
+        
+        # Scan each folder
+        for folder_name, metadata_info in folder_mapping.items():
+            folder_path = base_path / folder_name
+            
+            if not folder_path.exists():
+                print(f"Warning: Folder not found: {folder_path}")
+                continue
+            
+            # Find all .flac files
+            audio_files = list(folder_path.rglob('*.flac'))
+            print(f"Found {len(audio_files)} files in {folder_name}")
+            
+            for audio_file in audio_files:
+                # Extract information from file path
+                # Example: FakeVideo-FakeAudio/African/men/id00076/00109_10_id00476_wavtolip.flac
+                relative_path = audio_file.relative_to(base_path)
+                parts = relative_path.parts
+                
+                # Try to extract method from filename or use folder default
+                filename = audio_file.name
+                method = metadata_info['method']
+                
+                # Check if filename contains known attack methods
+                if 'wav2lip' in filename.lower() or 'wavtolip' in filename.lower():
+                    method = 'wav2lip'
+                elif 'faceswap' in filename.lower():
+                    method = 'faceswap-wav2lip'
+                elif 'fsgan' in filename.lower():
+                    method = 'fsgan-wav2lip'
+                elif 'rtvc' in filename.lower():
+                    method = 'rtvc'
+                
+                # Extract source/user_id from path if possible
+                source = parts[1] if len(parts) > 1 else 'unknown'
+                if len(parts) > 3:
+                    source = parts[3]  # This should be the id (e.g., id00076)
+                
+                records.append({
+                    'filename': filename,
+                    'path': str(relative_path.parent),
+                    'method': method,
+                    'type': metadata_info['type'],
+                    'audio_type': metadata_info['audio_type'],
+                    'source': source
+                })
+        
+        if not records:
+            raise ValueError(f"No audio files found in {base_path}")
+        
+        md = pd.DataFrame(records)
+        print(f"Generated metadata: {len(md)} samples")
+        print(f"Methods found: {md['method'].value_counts().to_dict()}")
+        print(f"Audio types: {md['audio_type'].value_counts().to_dict()}")
+        
         return md
 
     def get_fake_samples(self):
@@ -126,4 +201,3 @@ if __name__ == "__main__":
         print('fake', len(dataset))
 
     print(real, fake)
-
