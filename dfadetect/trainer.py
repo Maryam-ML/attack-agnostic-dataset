@@ -61,18 +61,25 @@ def pad_collate_fn(batch):
     # Use torch.stack on the padded list
     stacked_x = torch.stack(padded_x)
     
-    # Convert labels - handle both string and numeric labels
+    # Convert labels - handle multiple dataset label formats
     label_list = []
     for y in batch_y:
         if isinstance(y, str):
-            # Convert string labels to integers
-            # "spoof" or "fake" -> 1, "bonafide" or "real" -> 0
-            if y.lower() in ['spoof', 'fake']:
-                label_list.append(1)
-            elif y.lower() in ['bonafide', 'real', '-']:
+            y_lower = y.lower()
+            
+            # Bonafide/Real labels -> 0
+            if y_lower in ['bonafide', 'real', '-']:
                 label_list.append(0)
+            # Explicit spoof/fake labels -> 1
+            elif y_lower in ['spoof', 'fake']:
+                label_list.append(1)
+            # ASVspoof attack codes (A01, A02, etc.) -> 1 (spoof)
+            elif y.startswith('A') and len(y) >= 2 and y[1:].isdigit():
+                label_list.append(1)
+            # Any other attack identifier -> 1 (spoof)
             else:
-                raise ValueError(f"Unknown label: {y}")
+                # Assume unknown labels are attacks/spoofs
+                label_list.append(1)
         elif isinstance(y, torch.Tensor):
             label_list.append(y.item() if y.dim() == 0 else y)
         else:
