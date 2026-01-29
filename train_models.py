@@ -266,10 +266,10 @@ def parse_args():
     FAKEAVCELEB_DATASET_PATH = "../datasets/FakeAVCeleb"
 
     parser.add_argument(
-        "--asv_path", type=str, default=ASVSPOOF_DATASET_PATH, help="Path to ASVspoof2021 dataset directory",
+        "--asv_path", type=str, default=None, help="Path to ASVspoof2021 dataset directory",
     )
     parser.add_argument(
-        "--wavefake_path", type=str, default=WAVEFAKE_DATASET_PATH, help="Path to WaveFake dataset directory",
+        "--wavefake_path", type=str, default=None, help="Path to WaveFake dataset directory",
     )
     parser.add_argument(
         "--celeb_path", type=str, default=FAKEAVCELEB_DATASET_PATH, help="Path to FakeAVCeleb dataset directory",
