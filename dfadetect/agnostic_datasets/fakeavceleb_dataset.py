@@ -178,9 +178,9 @@ class FakeAVCelebDataset(SimpleAudioFakeDataset):
         return pd.DataFrame(samples)
 
     def get_file_path(self, sample):
-    # Build path directly from metadata without adding audio_folder prefix
-    file_path = Path(self.path) / sample["path"] / sample["filename"]
-    return file_path
+        # Build path directly from metadata without adding audio_folder prefix
+        file_path = Path(self.path) / sample["path"] / sample["filename"]
+        return file_path
 
 
 if __name__ == "__main__":
