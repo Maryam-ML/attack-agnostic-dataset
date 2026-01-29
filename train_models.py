@@ -263,7 +263,7 @@ def parse_args():
 
     ASVSPOOF_DATASET_PATH = "../datasets/ASVspoof2021/LA"
     WAVEFAKE_DATASET_PATH = "../datasets/WaveFake"
-    FAKEAVCELEB_DATASET_PATH = "../datasets/FakeAVCeleb/FakeAVCeleb_v1.2"
+    FAKEAVCELEB_DATASET_PATH = "../datasets/FakeAVCeleb"
 
     parser.add_argument(
         "--asv_path", type=str, default=ASVSPOOF_DATASET_PATH, help="Path to ASVspoof2021 dataset directory",
