@@ -74,8 +74,8 @@ def train_nn(
 
     for fold in range(folds_number):
         data_train = AttackAgnosticDataset(
-            asvspoof_path=datasets_paths[0],
-            wavefake_path=datasets_paths[1],
+            #asvspoof_path=datasets_paths[0],
+            #wavefake_path=datasets_paths[1],
             fakeavceleb_path=datasets_paths[2],
             fold_num=fold,
             fold_subset="train",
@@ -84,8 +84,8 @@ def train_nn(
         )
 
         data_test = AttackAgnosticDataset(
-            asvspoof_path=datasets_paths[0],
-            wavefake_path=datasets_paths[1],
+            #asvspoof_path=datasets_paths[0],
+            #wavefake_path=datasets_paths[1],
             fakeavceleb_path=datasets_paths[2],
             fold_num=fold,
             fold_subset="test",
@@ -141,8 +141,8 @@ def train_gmm(
 
     for fold in range(3):
         real_dataset_train = AttackAgnosticDataset(
-            asvspoof_path=datasets_paths[0],
-            wavefake_path=datasets_paths[1],
+            #asvspoof_path=datasets_paths[0],
+            #wavefake_path=datasets_paths[1],
             fakeavceleb_path=datasets_paths[2],
             fold_num=fold,
             fold_subset="train",
@@ -154,8 +154,8 @@ def train_gmm(
         real_dataset_train.get_bonafide_only()
 
         fake_dataset_train = AttackAgnosticDataset(
-            asvspoof_path=datasets_paths[0],
-            wavefake_path=datasets_paths[1],
+           # asvspoof_path=datasets_paths[0],
+            #wavefake_path=datasets_paths[1],
             fakeavceleb_path=datasets_paths[2],
             fold_num=fold,
             fold_subset="train",
@@ -261,8 +261,8 @@ def main(args):
 def parse_args():
     parser = argparse.ArgumentParser()
 
-    ASVSPOOF_DATASET_PATH = "../datasets/ASVspoof2021/LA"
-    WAVEFAKE_DATASET_PATH = "../datasets/WaveFake"
+    #ASVSPOOF_DATASET_PATH = "../datasets/ASVspoof2021/LA"
+    #WAVEFAKE_DATASET_PATH = "../datasets/WaveFake"
     FAKEAVCELEB_DATASET_PATH = "../datasets/FakeAVCeleb"
 
     parser.add_argument(
