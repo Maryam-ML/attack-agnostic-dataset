@@ -272,7 +272,7 @@ def parse_args():
         "--wavefake_path", type=str, default=None, help="Path to WaveFake dataset directory",
     )
     parser.add_argument(
-        "--celeb_path", type=str, default=FAKEAVCELEB_DATASET_PATH, help="Path to FakeAVCeleb dataset directory",
+        "--celeb_path", type=str, default="/kaggle/input/fakeavceleb-extracted-audio/FakeAVCeleb_Extracted_Audio", help="Path to FakeAVCeleb dataset directory",
     )
 
     default_model_config = "config.yaml"
