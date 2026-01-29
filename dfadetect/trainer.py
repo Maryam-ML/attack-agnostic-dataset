@@ -61,11 +61,24 @@ def pad_collate_fn(batch):
     # Use torch.stack on the padded list
     stacked_x = torch.stack(padded_x)
     
-    # Convert labels
-    if isinstance(batch_y[0], torch.Tensor):
-        batch_y_tensor = torch.stack(batch_y)
-    else:
-        batch_y_tensor = torch.tensor(batch_y)
+    # Convert labels - handle both string and numeric labels
+    label_list = []
+    for y in batch_y:
+        if isinstance(y, str):
+            # Convert string labels to integers
+            # "spoof" or "fake" -> 1, "bonafide" or "real" -> 0
+            if y.lower() in ['spoof', 'fake']:
+                label_list.append(1)
+            elif y.lower() in ['bonafide', 'real']:
+                label_list.append(0)
+            else:
+                raise ValueError(f"Unknown label: {y}")
+        elif isinstance(y, torch.Tensor):
+            label_list.append(y.item() if y.dim() == 0 else y)
+        else:
+            label_list.append(int(y))
+    
+    batch_y_tensor = torch.tensor(label_list, dtype=torch.long)
 
     return stacked_x, batch_meta, batch_y_tensor
 
