@@ -10,7 +10,6 @@ from dfadetect.agnostic_datasets.wavefake_dataset import WaveFakeDataset
 
 class AttackAgnosticDataset(SimpleAudioFakeDataset):
 
-
     def __init__(
         self,
         asvspoof_path=None,
@@ -26,40 +25,49 @@ class AttackAgnosticDataset(SimpleAudioFakeDataset):
     ):
         super().__init__(fold_num, fold_subset, transform, return_label)
 
-
         datasets = []
 
+        # Only load dataset if path is provided and valid
+        if asvspoof_path is not None and asvspoof_path != "" and str(asvspoof_path) != "None":
+            try:
+                asvspoof_dataset = ASVSpoofDataset(asvspoof_path, fold_num=fold_num, fold_subset=fold_subset)
+                datasets.append(asvspoof_dataset)
+                print(f"✓ Loaded ASVspoof dataset from {asvspoof_path}")
+            except Exception as e:
+                print(f"⚠ Warning: Could not load ASVspoof dataset: {e}")
 
-        if asvspoof_path is not None:
-            asvspoof_dataset = ASVSpoofDataset(asvspoof_path, fold_num=fold_num, fold_subset=fold_subset)
-            datasets.append(asvspoof_dataset)
+        if wavefake_path is not None and wavefake_path != "" and str(wavefake_path) != "None":
+            try:
+                wavefake_dataset = WaveFakeDataset(wavefake_path, fold_num=fold_num, fold_subset=fold_subset)
+                datasets.append(wavefake_dataset)
+                print(f"✓ Loaded WaveFake dataset from {wavefake_path}")
+            except Exception as e:
+                print(f"⚠ Warning: Could not load WaveFake dataset: {e}")
 
+        if fakeavceleb_path is not None and fakeavceleb_path != "" and str(fakeavceleb_path) != "None":
+            try:
+                fakeavceleb_dataset = FakeAVCelebDataset(fakeavceleb_path, fold_num=fold_num, fold_subset=fold_subset)
+                datasets.append(fakeavceleb_dataset)
+                print(f"✓ Loaded FakeAVCeleb dataset from {fakeavceleb_path}")
+            except Exception as e:
+                print(f"⚠ Warning: Could not load FakeAVCeleb dataset: {e}")
 
-        if wavefake_path is not None:
-            wavefake_dataset = WaveFakeDataset(wavefake_path, fold_num=fold_num, fold_subset=fold_subset)
-            datasets.append(wavefake_dataset)
-
-
-        if fakeavceleb_path is not None:
-            fakeavceleb_dataset = FakeAVCelebDataset(fakeavceleb_path, fold_num=fold_num, fold_subset=fold_subset)
-            datasets.append(fakeavceleb_dataset)
-
+        # Check if at least one dataset was loaded
+        if len(datasets) == 0:
+            raise ValueError("❌ No datasets were successfully loaded! At least one valid dataset path must be provided.")
 
         self.samples = pd.concat(
             [ds.samples for ds in datasets],
             ignore_index=True
         )
 
-
         if oversample:
             self.oversample_dataset()
         elif undersample:
             self.undersample_dataset()
 
-
         if reduced_number is not None:
             self.samples = self.samples.sample(reduced_number, replace=True, random_state=42)
-
 
     def oversample_dataset(self):
         # Check what labels we actually have
@@ -103,7 +111,6 @@ class AttackAgnosticDataset(SimpleAudioFakeDataset):
             self.samples = pd.concat([self.samples, bonafide], ignore_index=True)
             print(f"Oversampled bonafide by {diff_length} samples. Total samples now: {len(self.samples)}")
 
-
     def undersample_dataset(self):
         samples = self.samples.groupby(by=['label'])
         
@@ -134,7 +141,6 @@ class AttackAgnosticDataset(SimpleAudioFakeDataset):
             spoofs = samples.get_group(spoof_key).sample(bona_length, replace=True)
             self.samples = pd.concat([samples.get_group(bonafide_key), spoofs], ignore_index=True)
 
-
     def get_bonafide_only(self):
         samples = self.samples.groupby(by=['label'])
         
@@ -153,7 +159,6 @@ class AttackAgnosticDataset(SimpleAudioFakeDataset):
         
         self.samples = samples.get_group(bonafide_key)
         return self.samples
-
 
     def get_spoof_only(self):
         samples = self.samples.groupby(by=['label'])
