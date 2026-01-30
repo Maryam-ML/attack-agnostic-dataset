@@ -5,8 +5,15 @@ import time
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Union
 
-import torch
 import yaml
+import torch
+import gc
+
+# Clear GPU memory before training
+if torch.cuda.is_available():
+    torch.cuda.empty_cache()
+    gc.collect()
+
 
 from dfadetect.agnostic_datasets.attack_agnostic_dataset import AttackAgnosticDataset
 from dfadetect.cnn_features import CNNFeaturesSetting
@@ -16,6 +23,7 @@ from dfadetect.models.gaussian_mixture_model import GMMDescent, flatten_dataset
 from dfadetect.trainer import GDTrainer, GMMTrainer, NNDataSetting
 from dfadetect.utils import set_seed
 from experiment_config import feature_kwargs
+
 
 LOGGER = logging.getLogger()
 
