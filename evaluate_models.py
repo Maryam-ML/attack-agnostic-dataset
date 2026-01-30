@@ -163,9 +163,9 @@ def evaluate_nn(
 
         logging_prefix = f"fold_{fold}"
         data_val = AttackAgnosticDataset(
-            asvspoof_path=datasets_paths[0],
+            #asvspoof_path=datasets_paths[0],
             #wavefake_path=datasets_paths[1],
-            #fakeavceleb_path=datasets_paths[2],
+            fakeavceleb_path=datasets_paths[2],
             fold_num=fold,
             fold_subset="val",
             reduced_number=amount_to_use,
@@ -260,9 +260,9 @@ def evaluate_gmm(
     for subtype in ["val", "test", "train"]:
         for fold in [0, 1, 2]:
             real_dataset_test = AttackAgnosticDataset(
-                asvspoof_path=datasets_paths[0],
+                #asvspoof_path=datasets_paths[0],
                 #wavefake_path=datasets_paths[1],
-                #fakeavceleb_path=datasets_paths[2],
+                fakeavceleb_path=datasets_paths[2],
                 fold_num=fold,
                 fold_subset=subtype,
                 oversample=False,
@@ -273,9 +273,9 @@ def evaluate_gmm(
             real_dataset_test.get_bonafide_only()
 
             fake_dataset_test = AttackAgnosticDataset(
-                asvspoof_path=datasets_paths[0],
+                #asvspoof_path=datasets_paths[0],
                 #wavefake_path=datasets_paths[1],
-                #fakeavceleb_path=datasets_paths[2],
+                fakeavceleb_path=datasets_paths[2],
                 fold_num=fold,
                 fold_subset=subtype,
                 oversample=False,
@@ -385,15 +385,13 @@ def parse_args():
     parser = argparse.ArgumentParser()
 
     # If assigned as None, then it won't be taken into account
-    ASVSPOOF_DATASET_PATH = "../datasets/ASVspoof2021/LA"
+    #ASVSPOOF_DATASET_PATH = "../datasets/ASVspoof2021/LA"
     #WAVEFAKE_DATASET_PATH = "../datasets/WaveFake"
-    #FAKEAVCELEB_DATASET_PATH = "../datasets/FakeAVCeleb/FakeAVCeleb_v1.2"
+    FAKEAVCELEB_DATASET_PATH = "../datasets/FakeAVCeleb"
 
-    parser.add_argument(
-        "--asv_path", type=str, default=ASVSPOOF_DATASET_PATH
-    )
+    #parser.add_argument( "--asv_path", type=str, default=ASVSPOOF_DATASET_PATH)
     #parser.add_argument("--wavefake_path", type=str, default=WAVEFAKE_DATASET_PATH)
-    #parser.add_argument("--celeb_path", type=str, default=FAKEAVCELEB_DATASET_PATH)
+    parser.add_argument("--celeb_path", type=str, default=FAKEAVCELEB_DATASET_PATH)
 
     default_model_config = "config.yaml"
     parser.add_argument(
