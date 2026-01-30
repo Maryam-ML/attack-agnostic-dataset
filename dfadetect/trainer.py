@@ -244,7 +244,7 @@ class GDTrainer(Trainer):
             batch_size=self.batch_size,
             shuffle=True,
             drop_last=True,
-            num_workers=4,  # Optimized for your system
+            num_workers=2,  # Optimized for your system
             collate_fn=pad_collate_fn,
         )
 
@@ -252,7 +252,7 @@ class GDTrainer(Trainer):
             test,
             batch_size=self.batch_size,
             drop_last=True,
-            num_workers=4,
+            num_workers=2,
             collate_fn=pad_collate_fn,
         )
 
