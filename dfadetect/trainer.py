@@ -257,4 +257,115 @@ class GDTrainer(Trainer):
         )
 
         criterion = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
-        optim = self.optimizer_fn(model.parameters(), 
+        optim = self.optimizer_fn(model.parameters(), **self.optimizer_kwargs)
+
+        best_model = None
+        best_acc = 0.0
+
+        LOGGER.info(f"Starting training for {self.epochs} epochs!")
+
+        for epoch in range(self.epochs):
+            LOGGER.info(f"Epoch num: {epoch}")
+
+            running_loss = 0.0
+            num_correct = 0.0
+            num_total = 0.0
+
+            model.train()
+
+            for i, (batch_x, _, batch_y) in enumerate(train_loader):
+                batch_size = batch_x.size(0)
+                num_total += batch_size
+
+                batch_x = batch_x.to(self.device)
+
+                if nn_data_setting.use_cnn_features:
+                    batch_x = cnn_features.prepare_feature_vector(
+                        batch_x,
+                        cnn_features_setting=cnn_features_setting,
+                    )
+                    
+                    # Fix: Remove extra dimension after CNN features
+                    # Expected: [batch, channels, freq, time] = 4D
+                    # Got: [batch, 1, channels, freq, time] = 5D
+                    if batch_x.dim() == 5:
+                        batch_x = batch_x.squeeze(1)
+
+                # Ensure batch_y is the right shape [batch_size, 1]
+                if batch_y.dim() == 1:
+                    batch_y = batch_y.unsqueeze(1)
+                
+                batch_y = batch_y.float().to(self.device)
+
+                batch_out, batch_loss = forward_and_loss(
+                    model, criterion, batch_x, batch_y
+                )
+
+                batch_pred = (torch.sigmoid(batch_out) > 0.5).int()
+                num_correct += (batch_pred == batch_y.int()).sum().item()
+
+                running_loss += batch_loss.item() * batch_size
+
+                optim.zero_grad()
+                batch_loss.backward()
+                optim.step()
+
+            running_loss /= max(num_total, 1)
+            train_acc = 100 * num_correct / max(num_total, 1)
+
+            LOGGER.info(
+                f"Epoch [{epoch+1}/{self.epochs}]: "
+                f"train/{logging_prefix}__loss={running_loss:.4f}, "
+                f"train/{logging_prefix}__acc={train_acc:.2f}"
+            )
+
+            # -------- Evaluation --------
+            model.eval()
+            test_loss = 0.0
+            num_correct_test = 0.0
+            num_total_test = 0.0
+
+            with torch.no_grad():
+                for batch_x, _, batch_y in test_loader:
+                    batch_size = batch_x.size(0)
+                    num_total_test += batch_size
+
+                    batch_x = batch_x.to(self.device)
+
+                    if nn_data_setting.use_cnn_features:
+                        batch_x = cnn_features.prepare_feature_vector(
+                            batch_x,
+                            cnn_features_setting=cnn_features_setting,
+                        )
+                        
+                        # Fix: Remove extra dimension after CNN features
+                        if batch_x.dim() == 5:
+                            batch_x = batch_x.squeeze(1)
+
+                    if batch_y.dim() == 1:
+                        batch_y = batch_y.unsqueeze(1)
+                    
+                    batch_y = batch_y.float().to(self.device)
+
+                    batch_out = model(batch_x)
+                    loss = criterion(batch_out, batch_y)
+
+                    test_loss += loss.item() * batch_size
+                    batch_pred = (torch.sigmoid(batch_out) > 0.5).int()
+                    num_correct_test += (batch_pred == batch_y.int()).sum().item()
+
+            test_loss /= max(num_total_test, 1)
+            test_acc = 100 * num_correct_test / max(num_total_test, 1)
+
+            LOGGER.info(
+                f"Epoch [{epoch+1}/{self.epochs}]: "
+                f"test/{logging_prefix}__loss={test_loss:.4f}, "
+                f"test/{logging_prefix}__acc={test_acc:.2f}"
+            )
+
+            if best_model is None or test_acc > best_acc:
+                best_acc = test_acc
+                best_model = deepcopy(model.state_dict())
+
+        model.load_state_dict(best_model)
+        return model
