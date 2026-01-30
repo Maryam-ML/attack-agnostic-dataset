@@ -28,33 +28,33 @@ class AttackAgnosticDataset(SimpleAudioFakeDataset):
         datasets = []
 
         # Only load dataset if path is provided and valid
-        if asvspoof_path is not None and asvspoof_path != "" and str(asvspoof_path) != "None":
+        if asvspoof_path is not None and asvspoof_path != "" and str(asvspoof_path).lower() != "none":
             try:
                 asvspoof_dataset = ASVSpoofDataset(asvspoof_path, fold_num=fold_num, fold_subset=fold_subset)
                 datasets.append(asvspoof_dataset)
-                print(f"✓ Loaded ASVspoof dataset from {asvspoof_path}")
+                print(f"✓ Loaded ASVspoof dataset")
             except Exception as e:
-                print(f"⚠ Warning: Could not load ASVspoof dataset: {e}")
+                print(f"⚠ Skipping ASVspoof: {e}")
 
-        if wavefake_path is not None and wavefake_path != "" and str(wavefake_path) != "None":
+        if wavefake_path is not None and wavefake_path != "" and str(wavefake_path).lower() != "none":
             try:
                 wavefake_dataset = WaveFakeDataset(wavefake_path, fold_num=fold_num, fold_subset=fold_subset)
                 datasets.append(wavefake_dataset)
-                print(f"✓ Loaded WaveFake dataset from {wavefake_path}")
+                print(f"✓ Loaded WaveFake dataset")
             except Exception as e:
-                print(f"⚠ Warning: Could not load WaveFake dataset: {e}")
+                print(f"⚠ Skipping WaveFake: {e}")
 
-        if fakeavceleb_path is not None and fakeavceleb_path != "" and str(fakeavceleb_path) != "None":
+        if fakeavceleb_path is not None and fakeavceleb_path != "" and str(fakeavceleb_path).lower() != "none":
             try:
                 fakeavceleb_dataset = FakeAVCelebDataset(fakeavceleb_path, fold_num=fold_num, fold_subset=fold_subset)
                 datasets.append(fakeavceleb_dataset)
-                print(f"✓ Loaded FakeAVCeleb dataset from {fakeavceleb_path}")
+                print(f"✓ Loaded FakeAVCeleb dataset")
             except Exception as e:
-                print(f"⚠ Warning: Could not load FakeAVCeleb dataset: {e}")
+                print(f"⚠ Skipping FakeAVCeleb: {e}")
 
         # Check if at least one dataset was loaded
         if len(datasets) == 0:
-            raise ValueError("❌ No datasets were successfully loaded! At least one valid dataset path must be provided.")
+            raise ValueError("❌ No datasets loaded! Provide at least one valid dataset path.")
 
         self.samples = pd.concat(
             [ds.samples for ds in datasets],
