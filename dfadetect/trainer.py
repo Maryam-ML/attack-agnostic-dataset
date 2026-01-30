@@ -204,6 +204,7 @@ class GMMTrainer(Trainer):
 # Forward + loss helper
 # =========================
 def forward_and_loss(model, criterion, batch_x, batch_y, **kwargs):
+    print(f"DEBUG: batch_x shape before model: {batch_x.shape}")  # Add this line
     batch_out = model(batch_x)
     batch_loss = criterion(batch_out, batch_y)
     return batch_out, batch_loss
