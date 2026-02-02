@@ -83,8 +83,8 @@ def train_nn(
     for fold in range(folds_number):
         data_train = AttackAgnosticDataset(
             #asvspoof_path=datasets_paths[0],
-            #wavefake_path=datasets_paths[1],
-            fakeavceleb_path=datasets_paths[2],
+            wavefake_path=datasets_paths[1],
+            #fakeavceleb_path=datasets_paths[2],
             fold_num=fold,
             fold_subset="train",
             reduced_number=amount_to_use,
@@ -93,8 +93,8 @@ def train_nn(
 
         data_test = AttackAgnosticDataset(
             #asvspoof_path=datasets_paths[0],
-            #wavefake_path=datasets_paths[1],
-            fakeavceleb_path=datasets_paths[2],
+            wavefake_path=datasets_paths[1],
+            #fakeavceleb_path=datasets_paths[2],
             fold_num=fold,
             fold_subset="test",
             reduced_number=amount_to_use,
@@ -150,8 +150,8 @@ def train_gmm(
     for fold in range(3):
         real_dataset_train = AttackAgnosticDataset(
             #asvspoof_path=datasets_paths[0],
-            #wavefake_path=datasets_paths[1],
-            fakeavceleb_path=datasets_paths[2],
+            wavefake_path=datasets_paths[1],
+            #fakeavceleb_path=datasets_paths[2],
             fold_num=fold,
             fold_subset="train",
             oversample=False,
@@ -162,9 +162,9 @@ def train_gmm(
         real_dataset_train.get_bonafide_only()
 
         fake_dataset_train = AttackAgnosticDataset(
-           # asvspoof_path=datasets_paths[0],
-            #wavefake_path=datasets_paths[1],
-            fakeavceleb_path=datasets_paths[2],
+            #asvspoof_path=datasets_paths[0],
+            wavefake_path=datasets_paths[1],
+            #fakeavceleb_path=datasets_paths[2],
             fold_num=fold,
             fold_subset="train",
             oversample=False,
@@ -270,8 +270,8 @@ def parse_args():
     parser = argparse.ArgumentParser()
 
     #ASVSPOOF_DATASET_PATH = "../datasets/ASVspoof2021/LA"
-    #WAVEFAKE_DATASET_PATH = "../datasets/WaveFake"
-    FAKEAVCELEB_DATASET_PATH = "../datasets/FakeAVCeleb"
+    WAVEFAKE_DATASET_PATH = "../datasets/WaveFake"
+    #FAKEAVCELEB_DATASET_PATH = "../datasets/FakeAVCeleb"
 
     parser.add_argument(
         "--asv_path", type=str, default=None, help="Path to ASVspoof2021 dataset directory",
