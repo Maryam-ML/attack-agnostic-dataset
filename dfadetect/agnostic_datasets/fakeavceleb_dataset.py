@@ -50,22 +50,11 @@ class FakeAVCelebDataset(SimpleAudioFakeDataset):
 
         self.samples = pd.concat([self.get_fake_samples(), self.get_real_samples()], ignore_index=True)
 
-    def get_file_path(self, sample):
-            """
-            sample['audio_path'] example:
-              'FakeAVCeleb/FakeVideo-FakeAudio/African/men/id00076/00109_10_id00476_wavtolip.flac'
-            We want:
-              '/kaggle/input/datasets/mrquadian/fakeavceleb/FakeVideo-FakeAudio/African/men/id00076/...flac'
-            """
-            rel = sample["audio_path"]
-    
-            # If audio_path starts with 'FakeAVCeleb/', drop that part
-            parts = rel.split("/")
-            if parts[0] == "FakeAVCeleb":
-                rel = "/".join(parts[1:])
-    
-            # Join with base folder
-            return Path(self.audio_folder) / rel
+    def get_metadata(self):
+        md = pd.read_csv(Path(self.path) / self.metadata_file)
+        md["audio_type"] = md["type"].apply(lambda x: x.split("-")[-1])
+        return md
+
 
     def get_fake_samples(self):
         samples = {
@@ -114,9 +103,23 @@ class FakeAVCelebDataset(SimpleAudioFakeDataset):
 
         return pd.DataFrame(samples)
 
+
     def get_file_path(self, sample):
-        path = "/".join([self.audio_folder, *sample["path"].split("/")[1:]])
-        return Path(self.path) / path / Path(sample["path"]).with_suffix(self.audio_extension)
+            """
+            sample['audio_path'] example:
+              'FakeAVCeleb/FakeVideo-FakeAudio/African/men/id00076/00109_10_id00476_wavtolip.flac'
+            We want:
+              '/kaggle/input/datasets/mrquadian/fakeavceleb/FakeVideo-FakeAudio/African/men/id00076/...flac'
+            """
+            rel = sample["audio_path"]
+    
+            # If audio_path starts with 'FakeAVCeleb/', drop that part
+            parts = rel.split("/")
+            if parts[0] == "FakeAVCeleb":
+                rel = "/".join(parts[1:])
+    
+            # Join with base folder
+            return Path(self.audio_folder) / rel
 
 
 if __name__ == "__main__":
