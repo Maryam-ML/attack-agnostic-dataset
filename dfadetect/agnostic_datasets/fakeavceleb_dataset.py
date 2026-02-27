@@ -39,7 +39,7 @@ class FakeAVCelebDataset(SimpleAudioFakeDataset):
 
     def __init__(self, path, fold_num=0, fold_subset="train", transform=None):
         super().__init__(fold_num, fold_subset, transform)
-        self.path = Path(path)
+        self.path = Path(path).expanduser().resolve()
 
         self.fold_num, self.fold_subset = fold_num, fold_subset
         self.allowed_attacks = FAKEAVCELEB_KFOLD_SPLIT[fold_num][fold_subset]
@@ -124,7 +124,7 @@ class FakeAVCelebDataset(SimpleAudioFakeDataset):
                 return rel_path
 
             # Join with dataset root directory so the returned path is always valid
-            return self.path / rel_path
+            return (self.path / rel_path).resolve(strict=False)
 
 
 if __name__ == "__main__":
