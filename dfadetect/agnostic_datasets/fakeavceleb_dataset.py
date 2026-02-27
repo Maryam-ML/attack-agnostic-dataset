@@ -39,7 +39,7 @@ class FakeAVCelebDataset(SimpleAudioFakeDataset):
 
     def __init__(self, path, fold_num=0, fold_subset="train", transform=None):
         super().__init__(fold_num, fold_subset, transform)
-        self.path = path
+        self.path = Path(path)
 
         self.fold_num, self.fold_subset = fold_num, fold_subset
         self.allowed_attacks = FAKEAVCELEB_KFOLD_SPLIT[fold_num][fold_subset]
@@ -49,6 +49,7 @@ class FakeAVCelebDataset(SimpleAudioFakeDataset):
         self.metadata = self.get_metadata()
 
         self.samples = pd.concat([self.get_fake_samples(), self.get_real_samples()], ignore_index=True)
+        self.samples = self.samples[self.samples["path"].map(lambda p: Path(p).is_file())].reset_index(drop=True)
 
     def get_metadata(self):
         md = pd.read_csv(Path(self.path) / self.metadata_file)
@@ -118,8 +119,12 @@ class FakeAVCelebDataset(SimpleAudioFakeDataset):
             if parts[0] == "FakeAVCeleb":
                 rel = "/".join(parts[1:])
     
-            # Join with base folder
-            return Path(self.audio_folder) / rel
+            rel_path = Path(rel)
+            if rel_path.is_absolute():
+                return rel_path
+
+            # Join with dataset root directory so the returned path is always valid
+            return self.path / rel_path
 
 
 if __name__ == "__main__":
