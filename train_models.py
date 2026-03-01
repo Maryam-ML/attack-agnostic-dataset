@@ -88,7 +88,7 @@ def train_nn(
             fold_num=fold,
             fold_subset="train",
             reduced_number=amount_to_use,
-            oversample=True,
+            oversample=False,
         )
 
         data_test = AttackAgnosticDataset(
@@ -98,7 +98,7 @@ def train_nn(
             fold_num=fold,
             fold_subset="test",
             reduced_number=amount_to_use,
-            oversample=True,
+            oversample= False,
         )
 
         current_model = models.get_model(
@@ -106,6 +106,7 @@ def train_nn(
         ).to(device)
 
         LOGGER.info(f"Training '{model_name}' model on {len(data_train)} audio files.")
+        LOGGER.info(f"Testing '{model_name}' model on {len(data_test)} audio files.")
 
         current_model = GDTrainer(
             device=device,
