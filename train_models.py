@@ -108,28 +108,6 @@ def train_nn(
         LOGGER.info(f"Training '{model_name}' model on {len(data_train)} audio files.")
         LOGGER.info(f"Testing '{model_name}' model on {len(data_test)} audio files.")
 
-        current_model = GDTrainer(
-            device=device,
-            batch_size=batch_size,
-            epochs=epochs,
-            optimizer_kwargs=optimizer_config,
-        ).train(
-            dataset=data_train,
-            model=current_model,
-            test_dataset=data_test,
-            nn_data_setting=nn_data_setting,
-            logging_prefix=f"fold_{fold}",
-            cnn_features_setting=cnn_features_setting,
-        )
-
-        if model_dir is not None:
-            save_name = f"aad__{model_name}_fold_{fold}__{timestamp}"
-            save_model(
-                model=current_model,
-                model_dir=model_dir,
-                name=save_name,
-            )
-        LOGGER.info(f"Training model on fold [{fold+1}/{folds_number}] done!")
 
 
 def train_gmm(
