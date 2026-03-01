@@ -78,7 +78,7 @@ def train_nn(
         use_cnn_features=use_cnn_features,
     )
     timestamp = time.time()
-    folds_number = 1
+    folds_number = 3
 
     for fold in range(folds_number):
         data_train = AttackAgnosticDataset(
