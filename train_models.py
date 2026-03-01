@@ -101,6 +101,16 @@ def train_nn(
             oversample= True,
         )
 
+        data_val = AttackAgnosticDataset(
+            asvspoof_path=datasets_paths[0],
+            wavefake_path=datasets_paths[1],
+            fakeavceleb_path=datasets_paths[2],
+            fold_num=fold,
+            fold_subset="val",
+            reduced_number=amount_to_use,
+            oversample= True,
+        )
+
         current_model = models.get_model(
             model_name=model_name, config=model_parameters, device=device,
         ).to(device)
