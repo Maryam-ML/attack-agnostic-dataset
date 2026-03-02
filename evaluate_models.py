@@ -233,9 +233,6 @@ def evaluate_nn(
         y_pred_label = torch.Tensor([]).to(device)
         batches_number = len(data_val) // batch_size
 
-        # Map textual labels to numeric if needed
-        label_map = {"bonafide": 1, "spoof": 0}
-
         for i, (batch_x, _, batch_y) in enumerate(test_loader):
             model.eval()
             if i % 10 == 0:
@@ -244,10 +241,11 @@ def evaluate_nn(
             with torch.no_grad():
                 batch_x = batch_x.to(device)
 
-                # batch_y is a tuple/list from collate; convert to tensor
+                # batch_y is a tuple/list from collate; convert to binary tensor:
+                # bonafide -> 1, any other string (attack code like "A06") -> 0
                 if isinstance(batch_y[0], str):
                     batch_y = torch.tensor(
-                        [label_map[str(lbl)] for lbl in batch_y],
+                        [1 if str(lbl) == "bonafide" else 0 for lbl in batch_y],
                         dtype=torch.long,
                         device=device,
                     )
