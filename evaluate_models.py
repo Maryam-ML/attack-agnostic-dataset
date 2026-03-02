@@ -299,14 +299,14 @@ def evaluate_gmm(
 
 
     for subtype in ["val", "test", "train"]:
-        for fold in [0, 1, 2]:
+        for fold in [0]:
             real_dataset_test = AttackAgnosticDataset(
                 asvspoof_path=datasets_paths[0],
                 wavefake_path=datasets_paths[1],
                 fakeavceleb_path=datasets_paths[2],
                 fold_num=fold,
                 fold_subset=subtype,
-                oversample=False,
+                oversample=True,
                 undersample=False,
                 return_label=False,
                 reduced_number=amount_to_use,
@@ -320,7 +320,7 @@ def evaluate_gmm(
                 fakeavceleb_path=datasets_paths[2],
                 fold_num=fold,
                 fold_subset=subtype,
-                oversample=False,
+                oversample=True,
                 undersample=False,
                 return_label=False,
                 reduced_number=amount_to_use,
