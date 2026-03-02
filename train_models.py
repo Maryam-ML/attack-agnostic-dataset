@@ -5,15 +5,8 @@ import time
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Union
 
-import yaml
 import torch
-import gc
-
-# Clear GPU memory before training
-if torch.cuda.is_available():
-    torch.cuda.empty_cache()
-    gc.collect()
-
+import yaml
 
 from dfadetect.agnostic_datasets.attack_agnostic_dataset import AttackAgnosticDataset
 from dfadetect.cnn_features import CNNFeaturesSetting
@@ -23,7 +16,6 @@ from dfadetect.models.gaussian_mixture_model import GMMDescent, flatten_dataset
 from dfadetect.trainer import GDTrainer, GMMTrainer, NNDataSetting
 from dfadetect.utils import set_seed
 from experiment_config import feature_kwargs
-
 
 LOGGER = logging.getLogger()
 
@@ -88,7 +80,7 @@ def train_nn(
             fold_num=fold,
             fold_subset="train",
             reduced_number=amount_to_use,
-            oversample=False,
+            oversample=True,
         )
 
         data_test = AttackAgnosticDataset(
@@ -98,17 +90,7 @@ def train_nn(
             fold_num=fold,
             fold_subset="test",
             reduced_number=amount_to_use,
-            oversample= False,
-        )
-
-        data_val = AttackAgnosticDataset(
-            asvspoof_path=datasets_paths[0],
-            wavefake_path=datasets_paths[1],
-            fakeavceleb_path=datasets_paths[2],
-            fold_num=fold,
-            fold_subset="val",
-            reduced_number=amount_to_use,
-            oversample= False,
+            oversample=True,
         )
 
         current_model = models.get_model(
@@ -117,8 +99,29 @@ def train_nn(
 
         LOGGER.info(f"Training '{model_name}' model on {len(data_train)} audio files.")
         LOGGER.info(f"Testing '{model_name}' model on {len(data_test)} audio files.")
-        LOGGER.info(f"val set(Evaluation) '{model_name}' model on {len(data_val)} audio files.")
 
+        current_model = GDTrainer(
+            device=device,
+            batch_size=batch_size,
+            epochs=epochs,
+            optimizer_kwargs=optimizer_config,
+        ).train(
+            dataset=data_train,
+            model=current_model,
+            test_dataset=data_test,
+            nn_data_setting=nn_data_setting,
+            logging_prefix=f"fold_{fold}",
+            cnn_features_setting=cnn_features_setting,
+        )
+
+        if model_dir is not None:
+            save_name = f"aad__{model_name}_fold_{fold}__{timestamp}"
+            save_model(
+                model=current_model,
+                model_dir=model_dir,
+                name=save_name,
+            )
+        LOGGER.info(f"Training model on fold [{fold+1}/{folds_number}] done!")
 
 
 def train_gmm(
@@ -261,16 +264,16 @@ def parse_args():
 
     ASVSPOOF_DATASET_PATH = "../datasets/ASVspoof2021/LA"
     WAVEFAKE_DATASET_PATH = "../datasets/WaveFake"
-    FAKEAVCELEB_DATASET_PATH = "../datasets/FakeAVCeleb"
+    FAKEAVCELEB_DATASET_PATH = "../datasets/FakeAVCeleb/FakeAVCeleb_v1.2"
 
     parser.add_argument(
-        "--asv_path", type=str, default=None, help="Path to ASVspoof2021 dataset directory",
+        "--asv_path", type=str, default=ASVSPOOF_DATASET_PATH, help="Path to ASVspoof2021 dataset directory",
     )
     parser.add_argument(
-        "--wavefake_path", type=str, default=None, help="Path to WaveFake dataset directory",
+        "--wavefake_path", type=str, default=WAVEFAKE_DATASET_PATH, help="Path to WaveFake dataset directory",
     )
     parser.add_argument(
-        "--celeb_path", type=str, default=None, help="Path to FakeAVCeleb dataset directory",
+        "--celeb_path", type=str, default=FAKEAVCELEB_DATASET_PATH, help="Path to FakeAVCeleb dataset directory",
     )
 
     default_model_config = "config.yaml"
