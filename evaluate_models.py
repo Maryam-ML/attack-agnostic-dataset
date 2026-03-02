@@ -19,7 +19,7 @@ from sklearn.metrics import (
     roc_curve,
 )
 from torch.utils.data import DataLoader
-from torch.nn.utils.rnn import pad_sequence  # NEW
+from torch.nn.utils.rnn import pad_sequence  # can be unused
 
 from dfadetect import cnn_features
 from dfadetect.agnostic_datasets.attack_agnostic_dataset import (
@@ -51,8 +51,8 @@ ch.setFormatter(formatter)
 LOGGER.addHandler(ch)
 
 
-# ========= NEW: collate function for variable-length waveforms =========
-TARGET_LEN = 64000  # you can change this if you want a different fixed length
+# ========= collate function for variable-length waveforms =========
+TARGET_LEN = 64000  # fixed length for cropping/padding
 
 
 def collate_pad_waveforms(batch):
@@ -73,11 +73,10 @@ def collate_pad_waveforms(batch):
         processed_xs.append(x)
 
     xs_batch = torch.stack(processed_xs, dim=0)  # [B, TARGET_LEN]
-    ys_batch = torch.tensor(ys, dtype=torch.long)
 
-    # metas stay as list
-    return xs_batch, metas, ys_batch
-# =======================================================================
+    # metas stays as list; ys stays as tuple/list (may contain strings)
+    return xs_batch, metas, ys
+# ==================================================================
 
 
 def plot_roc(
@@ -224,7 +223,7 @@ def evaluate_nn(
             batch_size=batch_size,
             drop_last=True,
             num_workers=3,
-            collate_fn=collate_pad_waveforms,  # <<< NEW
+            collate_fn=collate_pad_waveforms,
         )
 
         num_correct = 0.0
@@ -234,6 +233,9 @@ def evaluate_nn(
         y_pred_label = torch.Tensor([]).to(device)
         batches_number = len(data_val) // batch_size
 
+        # Map textual labels to numeric if needed
+        label_map = {"bonafide": 1, "spoof": 0}
+
         for i, (batch_x, _, batch_y) in enumerate(test_loader):
             model.eval()
             if i % 10 == 0:
@@ -241,7 +243,19 @@ def evaluate_nn(
 
             with torch.no_grad():
                 batch_x = batch_x.to(device)
-                batch_y = batch_y.to(device)
+
+                # batch_y is a tuple/list from collate; convert to tensor
+                if isinstance(batch_y[0], str):
+                    batch_y = torch.tensor(
+                        [label_map[str(lbl)] for lbl in batch_y],
+                        dtype=torch.long,
+                        device=device,
+                    )
+                else:
+                    batch_y = torch.tensor(
+                        batch_y, dtype=torch.long, device=device
+                    )
+
                 num_total += batch_x.size(0)
 
                 if nn_data_setting.use_cnn_features:
