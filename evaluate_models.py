@@ -190,6 +190,11 @@ def evaluate_nn(
             fold_subset="val",
             reduced_number=amount_to_use,
         )
+         # ===== DEBUG SHAPES HERE =====
+        print("First 10 sample shapes:")
+        for idx in range(10):
+            x, _, y = data_val[idx]
+            print(idx, x.shape, y)
         LOGGER.info(f"Testing '{model_name}' model, weights path: '{weights_path}', on {len(data_val)} audio files.")
         print(f"Test Fold [{fold+1}/{3}]: ")
         test_loader = DataLoader(
