@@ -279,17 +279,28 @@ def evaluate_nn(
                 )
                 y = torch.concat([y, batch_y], dim=0)
 
+        # === Metrics with safety for one-class case ===
         eval_accuracy = (num_correct / num_total) * 100
 
+        y_np = y.cpu().numpy()
+        y_pred_label_np = y_pred_label.cpu().numpy()
+
         precision, recall, f1_score, support = precision_recall_fscore_support(
-            y.cpu().numpy(),
-            y_pred_label.cpu().numpy(),
+            y_np,
+            y_pred_label_np,
             average="binary",
             beta=1.0,
+            zero_division=0,
         )
-        auc_score = roc_auc_score(
-            y_true=y.cpu().numpy(), y_score=y_pred_label.cpu().numpy()
-        )
+
+        unique_classes = np.unique(y_np)
+        if unique_classes.shape[0] < 2:
+            auc_score = float("nan")
+            LOGGER.warning(
+                f"{logging_prefix}: Only one class present in y_true; ROC AUC undefined for this fold."
+            )
+        else:
+            auc_score = roc_auc_score(y_true=y_np, y_score=y_pred_label_np)
 
         # For EER flip values, following original evaluation implementation
         y_for_eer = 1 - y
