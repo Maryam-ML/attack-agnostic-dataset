@@ -314,6 +314,10 @@ def evaluate_nn(
 
         y_np = y.cpu().numpy()
         y_pred_label_np = y_pred_label.cpu().numpy()
+                # DEBUG: inspect label and prediction distribution
+        print("=== Fold", fold, "label/pred stats ===")
+        print("y unique and counts:", np.unique(y_np, return_counts=True))
+        print("y_pred_label unique and counts:", np.unique(y_pred_label_np, return_counts=True))
 
         precision, recall, f1_score, support = precision_recall_fscore_support(
             y_np,
