@@ -42,6 +42,7 @@ from dfadetect.trainer import NNDataSetting
 from dfadetect.utils import set_seed
 from experiment_config import feature_kwargs
 
+
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
 
@@ -303,18 +304,14 @@ def evaluate_nn(
                     [y_pred_label, batch_pred_label], dim=0
                 )
                 y = torch.concat([y, batch_y], dim=0)
-                    # DEBUG: inspect label and prediction distribution
-        print("=== Fold", fold, "label/pred stats ===")
-        print("y unique and counts:", np.unique(y_np, return_counts=True))
-        print("y_pred_label unique and counts:", np.unique(y_pred_label_np, return_counts=True))
-    
 
         # === Metrics with safety for one-class case ===
         eval_accuracy = (num_correct / num_total) * 100
 
         y_np = y.cpu().numpy()
         y_pred_label_np = y_pred_label.cpu().numpy()
-                # DEBUG: inspect label and prediction distribution
+
+        # DEBUG: inspect label and prediction distribution
         print("=== Fold", fold, "label/pred stats ===")
         print("y unique and counts:", np.unique(y_np, return_counts=True))
         print("y_pred_label unique and counts:", np.unique(y_pred_label_np, return_counts=True))
