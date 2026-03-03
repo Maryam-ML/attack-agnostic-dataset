@@ -112,10 +112,51 @@ def plot_roc(
 
 
 def calculate_eer(y, y_score) -> Tuple[float, float, np.ndarray, np.ndarray]:
+    y = np.asarray(y)
+    y_score = np.asarray(y_score)
+
+    if np.unique(y).shape[0] < 2:
+        LOGGER.warning("Only one class present in labels; EER is undefined.")
+        nan_arr = np.array([np.nan], dtype=np.float64)
+        return float("nan"), float("nan"), nan_arr, nan_arr
+
     fpr, tpr, thresholds = roc_curve(y, -y_score)
 
-    eer = brentq(lambda x: 1.0 - x - interp1d(fpr, tpr)(x), 0.0, 1.0)
-    thresh = interp1d(fpr, thresholds)(eer)
+    valid_mask = np.isfinite(fpr) & np.isfinite(tpr) & np.isfinite(thresholds)
+    fpr = fpr[valid_mask]
+    tpr = tpr[valid_mask]
+    thresholds = thresholds[valid_mask]
+
+    if fpr.size == 0:
+        LOGGER.warning("ROC curve produced no finite points; EER is undefined.")
+        nan_arr = np.array([np.nan], dtype=np.float64)
+        return float("nan"), float("nan"), nan_arr, nan_arr
+
+    interp_tpr = interp1d(fpr, tpr, bounds_error=False, fill_value=(tpr[0], tpr[-1]))
+    objective = lambda x: 1.0 - x - interp_tpr(x)
+
+    f0 = float(objective(0.0))
+    f1 = float(objective(1.0))
+    if not (np.isfinite(f0) and np.isfinite(f1)):
+        LOGGER.warning("EER objective returned NaN/Inf at interval boundaries.")
+        return float("nan"), float("nan"), fpr, tpr
+
+    if f0 * f1 > 0:
+        # No guaranteed root in [0, 1]; use best approximation on available ROC points.
+        distances = np.abs((1.0 - fpr) - tpr)
+        best_idx = int(np.nanargmin(distances))
+        eer = float((fpr[best_idx] + (1.0 - tpr[best_idx])) / 2.0)
+    else:
+        eer = float(brentq(objective, 0.0, 1.0))
+
+    thresh = float(
+        interp1d(
+            fpr,
+            thresholds,
+            bounds_error=False,
+            fill_value=(thresholds[0], thresholds[-1]),
+        )(eer)
+    )
     return thresh, eer, fpr, tpr
 
 
