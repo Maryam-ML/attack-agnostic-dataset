@@ -112,10 +112,35 @@ def plot_roc(
 
 
 def calculate_eer(y, y_score) -> Tuple[float, float, np.ndarray, np.ndarray]:
+    # y: 0/1 labels, y_score: raw scores
     fpr, tpr, thresholds = roc_curve(y, -y_score)
 
-    eer = brentq(lambda x: 1.0 - x - interp1d(fpr, tpr)(x), 0.0, 1.0)
-    thresh = interp1d(fpr, thresholds)(eer)
+    # If ROC curve is degenerate, just return NaNs
+    if (
+        fpr.size == 0
+        or tpr.size == 0
+        or np.all(np.isnan(fpr))
+        or np.all(np.isnan(tpr))
+    ):
+        return np.nan, np.nan, fpr, tpr
+
+    try:
+        eer = brentq(
+            lambda x: 1.0
+            - x
+            - interp1d(
+                fpr, tpr, bounds_error=False, fill_value="extrapolate"
+            )(x),
+            0.0,
+            1.0,
+        )
+        thresh = interp1d(
+            fpr, thresholds, bounds_error=False, fill_value="extrapolate"
+        )(eer)
+    except Exception:
+        eer = np.nan
+        thresh = np.nan
+
     return thresh, eer, fpr, tpr
 
 
@@ -304,11 +329,20 @@ def evaluate_nn(
 
         # For EER flip values, following original evaluation implementation
         y_for_eer = 1 - y
+        y_for_eer_np = y_for_eer.cpu().numpy()
+        y_score_np = y_pred.cpu().numpy()
 
-        thresh, eer, fpr, tpr = calculate_eer(
-            y=y_for_eer.cpu().numpy(),
-            y_score=y_pred.cpu().numpy(),
-        )
+        # If only one class, skip EER completely
+        if np.unique(y_for_eer_np).shape[0] < 2:
+            thresh, eer, fpr, tpr = np.nan, np.nan, np.array([]), np.array([])
+            LOGGER.warning(
+                f"{logging_prefix}: Only one class present in y_for_eer; EER undefined for this fold."
+            )
+        else:
+            thresh, eer, fpr, tpr = calculate_eer(
+                y=y_for_eer_np,
+                y_score=y_score_np,
+            )
 
         eer_label = f"eval/{logging_prefix}__eer"
         accuracy_label = f"eval/{logging_prefix}__accuracy"
