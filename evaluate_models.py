@@ -303,6 +303,11 @@ def evaluate_nn(
                     [y_pred_label, batch_pred_label], dim=0
                 )
                 y = torch.concat([y, batch_y], dim=0)
+                    # DEBUG: inspect label and prediction distribution
+        print("=== Fold", fold, "label/pred stats ===")
+        print("y unique and counts:", np.unique(y_np, return_counts=True))
+        print("y_pred_label unique and counts:", np.unique(y_pred_label_np, return_counts=True))
+    
 
         # === Metrics with safety for one-class case ===
         eval_accuracy = (num_correct / num_total) * 100
