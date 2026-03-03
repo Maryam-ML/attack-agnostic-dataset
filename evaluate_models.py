@@ -382,7 +382,7 @@ def evaluate_gmm(
     LOGGER.info(f"paths: {real_model_path}, {fake_model_path}, {datasets_paths}")
 
     for subtype in ["val", "test", "train"]:
-        for fold in [0]:
+        for fold in [0, 1, 2]:
             real_dataset_test = AttackAgnosticDataset(
                 asvspoof_path=datasets_paths[0],
                 wavefake_path=datasets_paths[1],
