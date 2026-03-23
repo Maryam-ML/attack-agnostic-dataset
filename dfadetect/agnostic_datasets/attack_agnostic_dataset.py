@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pandas as pd
 
 
@@ -60,6 +62,14 @@ class AttackAgnosticDataset(SimpleAudioFakeDataset):
             [ds.samples for ds in datasets],
             ignore_index=True
         )
+
+        # Final safety net: remove broken/unresolvable files from any source dataset
+        before_len = len(self.samples)
+        self.samples = self.samples[self.samples["path"].map(lambda p: pd.notna(p) and Path(str(p)).is_file())]
+        self.samples = self.samples.reset_index(drop=True)
+        dropped = before_len - len(self.samples)
+        if dropped > 0:
+            print(f"⚠ Dropped {dropped} samples with missing audio files.")
 
         if oversample:
             self.oversample_dataset()
