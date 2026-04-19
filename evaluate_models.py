@@ -12,72 +12,31 @@ import tqdm
 import yaml
 from scipy.interpolate import interp1d
 from scipy.optimize import brentq
-from sklearn.metrics import (
-    auc,
-    precision_recall_fscore_support,
-    roc_auc_score,
-    roc_curve,
-)
+from sklearn.metrics import (auc, precision_recall_fscore_support,
+                             roc_auc_score, roc_curve)
 from torch.utils.data import DataLoader
-from torch.nn.utils.rnn import pad_sequence  # can be unused
 
 from dfadetect import cnn_features
-from dfadetect.agnostic_datasets.attack_agnostic_dataset import (
-    AttackAgnosticDataset,
-)
+from dfadetect.agnostic_datasets.attack_agnostic_dataset import \
+    AttackAgnosticDataset
 from dfadetect.cnn_features import CNNFeaturesSetting
-from dfadetect.datasets import (
-    TransformDataset,
-    apply_feature_and_double_delta,
-    lfcc,
-    mfcc,
-)
+from dfadetect.datasets import (TransformDataset,
+                                apply_feature_and_double_delta, lfcc, mfcc)
 from dfadetect.models import models
-from dfadetect.models.gaussian_mixture_model import (
-    GMMBase,
-    classify_dataset,
-    load_model,
-)
+from dfadetect.models.gaussian_mixture_model import (GMMBase, classify_dataset,
+                                                     load_model)
 from dfadetect.trainer import NNDataSetting
 from dfadetect.utils import set_seed
 from experiment_config import feature_kwargs
-
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
 
 ch = logging.StreamHandler()
-formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 ch.setFormatter(formatter)
 LOGGER.addHandler(ch)
 
-
-# ========= collate function for variable-length waveforms =========
-TARGET_LEN = 64000  # fixed length for cropping/padding
-
-
-def collate_pad_waveforms(batch):
-    # batch is a list of (x, meta, y)
-    xs, metas, ys = zip(*batch)
-
-    processed_xs = []
-    for x in xs:
-        # ensure 1D waveform
-        if x.dim() > 1:
-            x = x.squeeze()
-        T = x.size(0)
-        if T >= TARGET_LEN:
-            x = x[:TARGET_LEN]
-        else:
-            pad = torch.zeros(TARGET_LEN - T, dtype=x.dtype)
-            x = torch.cat([x, pad], dim=0)
-        processed_xs.append(x)
-
-    xs_batch = torch.stack(processed_xs, dim=0)  # [B, TARGET_LEN]
-
-    # metas stays as list; ys stays as tuple/list (may contain strings)
-    return xs_batch, metas, ys
-# ==================================================================
 
 
 def plot_roc(
@@ -91,18 +50,15 @@ def plot_roc(
 ) -> matplotlib.figure.Figure:
     roc_auc = auc(fpr, tpr)
     fig, ax = plt.subplots()
-    ax.plot(
-        fpr,
-        tpr,
-        color="darkorange",
-        lw=lw,
-        label="ROC curve (area = %0.2f)" % roc_auc,
-    )
-    ax.plot([0, 1], [0, 1], color="navy", lw=lw, linestyle="--")
+    ax.plot(fpr, tpr, color='darkorange',
+            lw=lw, label='ROC curve (area = %0.2f)' % roc_auc)
+    ax.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
     ax.set_xlim([0.0, 1.0])
     ax.set_ylim([0.0, 1.05])
-    ax.set_xlabel("False Positive Rate")
-    ax.set_ylabel("True Positive Rate")
+    ax.set_xlabel('False Positive Rate')
+    ax.set_ylabel('True Positive Rate')
+    # ax.set_title(
+        # f'Train: {training_dataset_name}\nEvaluated on {fake_dataset_name}')
     ax.legend(loc="lower right")
 
     fig.tight_layout()
@@ -113,35 +69,10 @@ def plot_roc(
 
 
 def calculate_eer(y, y_score) -> Tuple[float, float, np.ndarray, np.ndarray]:
-    # y: 0/1 labels, y_score: raw scores
     fpr, tpr, thresholds = roc_curve(y, -y_score)
 
-    # If ROC curve is degenerate, just return NaNs
-    if (
-        fpr.size == 0
-        or tpr.size == 0
-        or np.all(np.isnan(fpr))
-        or np.all(np.isnan(tpr))
-    ):
-        return np.nan, np.nan, fpr, tpr
-
-    try:
-        eer = brentq(
-            lambda x: 1.0
-            - x
-            - interp1d(
-                fpr, tpr, bounds_error=False, fill_value="extrapolate"
-            )(x),
-            0.0,
-            1.0,
-        )
-        thresh = interp1d(
-            fpr, thresholds, bounds_error=False, fill_value="extrapolate"
-        )(eer)
-    except Exception:
-        eer = np.nan
-        thresh = np.nan
-
+    eer = brentq(lambda x: 1. - x - interp1d(fpr, tpr)(x), 0., 1.)
+    thresh = interp1d(fpr, thresholds)(eer)
     return thresh, eer, fpr, tpr
 
 
@@ -159,25 +90,25 @@ def calculate_eer_for_models(
         real_model,
         fake_model,
         real_dataset_test,
-        device,
+        device
     ).numpy()
 
     fake_scores = classify_dataset(
         real_model,
         fake_model,
         fake_dataset_test,
-        device,
+        device
     ).numpy()
 
     # JSUT fake samples are fewer available
-    length = min(len(real_scores), len(fake_scores))
+    length = min(len(real_scores),  len(fake_scores))
     real_scores = real_scores[:length]
     fake_scores = fake_scores[:length]
 
     labels = np.concatenate(
         (
             np.zeros(real_scores.shape, dtype=np.int32),
-            np.ones(fake_scores.shape, dtype=np.int32),
+            np.ones(fake_scores.shape, dtype=np.int32)
         )
     )
 
@@ -215,19 +146,19 @@ def evaluate_nn(
     else:
         cnn_features_setting = CNNFeaturesSetting()
 
-    weights_path = ""
+    weights_path = ''
     for fold in tqdm.tqdm(range(3)):
         # Load model architecture
         model = models.get_model(
-            model_name=model_name,
-            config=model_parameters,
-            device=device,
+            model_name=model_name, config=model_parameters, device=device,
         )
         # If provided weights, apply corresponding ones (from an appropriate fold)
         if len(model_paths) > 1:
             assert len(model_paths) == 3, "Pass either 0 or 3 weights path"
             weights_path = model_paths[fold]
-            model.load_state_dict(torch.load(weights_path))
+            model.load_state_dict(
+                torch.load(weights_path)
+            )
         model = model.to(device)
 
         logging_prefix = f"fold_{fold}"
@@ -239,17 +170,13 @@ def evaluate_nn(
             fold_subset="val",
             reduced_number=amount_to_use,
         )
-        LOGGER.info(
-            f"Testing '{model_name}' model, weights path: '{weights_path}', on {len(data_val)} audio files."
-        )
+        LOGGER.info(f"Testing '{model_name}' model, weights path: '{weights_path}', on {len(data_val)} audio files.")
         print(f"Test Fold [{fold+1}/{3}]: ")
-
         test_loader = DataLoader(
             data_val,
             batch_size=batch_size,
             drop_last=True,
             num_workers=3,
-            collate_fn=collate_pad_waveforms,
         )
 
         num_correct = 0.0
@@ -266,89 +193,39 @@ def evaluate_nn(
 
             with torch.no_grad():
                 batch_x = batch_x.to(device)
-
-                # batch_y is a tuple/list from collate; convert to binary tensor:
-                # bonafide -> 1, any other string (attack code like "A06") -> 0
-                if isinstance(batch_y[0], str):
-                    batch_y = torch.tensor(
-                        [1 if str(lbl) == "bonafide" else 0 for lbl in batch_y],
-                        dtype=torch.long,
-                        device=device,
-                    )
-                else:
-                    batch_y = torch.tensor(
-                        batch_y, dtype=torch.long, device=device
-                    )
-
+                batch_y = batch_y.to(device)
                 num_total += batch_x.size(0)
 
                 if nn_data_setting.use_cnn_features:
-                    batch_x = cnn_features.prepare_feature_vector(
-                        batch_x, cnn_features_setting=cnn_features_setting
-                    )
-
-                    # Fix: Remove extra dimension after CNN features
-                    if batch_x.dim() == 5:
-                        batch_x = batch_x.squeeze(1)
+                    batch_x = cnn_features.prepare_feature_vector(batch_x, cnn_features_setting=cnn_features_setting)
 
                 batch_pred = model(batch_x).squeeze(1)
                 batch_pred = torch.sigmoid(batch_pred)
-                batch_pred_label = (batch_pred + 0.5).int()
+                batch_pred_label = (batch_pred + .5).int()
 
-                num_correct += (
-                    batch_pred_label == batch_y.int()
-                ).sum(dim=0).item()
+                num_correct += (batch_pred_label == batch_y.int()).sum(dim=0).item()
 
                 y_pred = torch.concat([y_pred, batch_pred], dim=0)
-                y_pred_label = torch.concat(
-                    [y_pred_label, batch_pred_label], dim=0
-                )
+                y_pred_label = torch.concat([y_pred_label, batch_pred_label], dim=0)
                 y = torch.concat([y, batch_y], dim=0)
 
-        # === Metrics with safety for one-class case ===
         eval_accuracy = (num_correct / num_total) * 100
 
-        y_np = y.cpu().numpy()
-        y_pred_label_np = y_pred_label.cpu().numpy()
-
-        # DEBUG: inspect label and prediction distribution
-        print("=== Fold", fold, "label/pred stats ===")
-        print("y unique and counts:", np.unique(y_np, return_counts=True))
-        print("y_pred_label unique and counts:", np.unique(y_pred_label_np, return_counts=True))
-
         precision, recall, f1_score, support = precision_recall_fscore_support(
-            y_np,
-            y_pred_label_np,
+            y.cpu().numpy(),
+            y_pred_label.cpu().numpy(),
             average="binary",
-            beta=1.0,
-            zero_division=0,
+            beta=1.0
         )
-
-        unique_classes = np.unique(y_np)
-        if unique_classes.shape[0] < 2:
-            auc_score = float("nan")
-            LOGGER.warning(
-                f"{logging_prefix}: Only one class present in y_true; ROC AUC undefined for this fold."
-            )
-        else:
-            auc_score = roc_auc_score(y_true=y_np, y_score=y_pred_label_np)
+        auc_score = roc_auc_score(y_true=y.cpu().numpy(), y_score=y_pred_label.cpu().numpy())
 
         # For EER flip values, following original evaluation implementation
         y_for_eer = 1 - y
-        y_for_eer_np = y_for_eer.cpu().numpy()
-        y_score_np = y_pred.cpu().numpy()
 
-        # If only one class, skip EER completely
-        if np.unique(y_for_eer_np).shape[0] < 2:
-            thresh, eer, fpr, tpr = np.nan, np.nan, np.array([]), np.array([])
-            LOGGER.warning(
-                f"{logging_prefix}: Only one class present in y_for_eer; EER undefined for this fold."
-            )
-        else:
-            thresh, eer, fpr, tpr = calculate_eer(
-                y=y_for_eer_np,
-                y_score=y_score_np,
-            )
+        thresh, eer, fpr, tpr = calculate_eer(
+            y=y_for_eer.cpu().numpy(),
+            y_score=y_pred.cpu().numpy(),
+        )
 
         eer_label = f"eval/{logging_prefix}__eer"
         accuracy_label = f"eval/{logging_prefix}__accuracy"
@@ -358,9 +235,7 @@ def evaluate_nn(
         auc_label = f"eval/{logging_prefix}__auc"
 
         LOGGER.info(
-            f"{eer_label}: {eer:.4f}, {accuracy_label}: {eval_accuracy:.4f}, "
-            f"{precision_label}: {precision:.4f}, {recall_label}: {recall:.4f}, "
-            f"{f1_label}: {f1_score:.4f}, {auc_label}: {auc_score:.4f}"
+            f"{eer_label}: {eer:.4f}, {accuracy_label}: {eval_accuracy:.4f}, {precision_label}: {precision:.4f}, {recall_label}: {recall:.4f}, {f1_label}: {f1_score:.4f}, {auc_label}: {auc_score:.4f}"
         )
 
 
@@ -375,8 +250,9 @@ def evaluate_gmm(
     device: str,
     frontend: str,
     output_file_name: str,
-    use_double_delta: bool = True,
+    use_double_delta: bool = True
 ):
+
     complete_results = {}
 
     LOGGER.info(f"paths: {real_model_path}, {fake_model_path}, {datasets_paths}")
@@ -389,7 +265,7 @@ def evaluate_gmm(
                 fakeavceleb_path=datasets_paths[2],
                 fold_num=fold,
                 fold_subset=subtype,
-                oversample=True,
+                oversample=False,
                 undersample=False,
                 return_label=False,
                 reduced_number=amount_to_use,
@@ -402,7 +278,7 @@ def evaluate_gmm(
                 fakeavceleb_path=datasets_paths[2],
                 fold_num=fold,
                 fold_subset=subtype,
-                oversample=True,
+                oversample=False,
                 undersample=False,
                 return_label=False,
                 reduced_number=amount_to_use,
@@ -413,7 +289,7 @@ def evaluate_gmm(
                 [real_dataset_test, fake_dataset_test],
                 feature_fn=feature_fn,
                 feature_kwargs=feature_kwargs,
-                use_double_delta=use_double_delta,
+                use_double_delta=use_double_delta
             )
 
             model_path = Path(real_model_path) / f"real_{fold}" / "ckpt.pth"
@@ -440,7 +316,7 @@ def evaluate_gmm(
 
             results = {"fold": fold}
 
-            LOGGER.info("Calculating on folds...")
+            LOGGER.info(f"Calculating on folds...")
 
             eer, thresh, fpr, tpr = calculate_eer_for_models(
                 real_model,
@@ -457,9 +333,7 @@ def evaluate_gmm(
             results["fpr"] = str(list(fpr))
             results["tpr"] = str(list(tpr))
 
-            LOGGER.info(
-                f"{subtype} | Fold {fold}:\n\tEER: {eer} Thresh: {thresh}"
-            )
+            LOGGER.info(f"{subtype} | Fold {fold}:\n\tEER: {eer} Thresh: {thresh}")
 
             complete_results[subtype] = {}
             complete_results[subtype][fold] = results
@@ -469,6 +343,7 @@ def evaluate_gmm(
 
 
 def main(args):
+
     if not args.cpu and torch.cuda.is_available():
         device = "cuda"
     else:
@@ -478,6 +353,7 @@ def main(args):
         config = yaml.safe_load(f)
 
     seed = config["data"].get("seed", 42)
+    # fix all seeds - this should not actually change anything
     set_seed(seed)
 
     if not args.use_gmm:
@@ -501,95 +377,58 @@ def main(args):
             frontend="lfcc" if args.lfcc else "mfcc",
             amount_to_use=args.amount,
             output_file_name="gmm_evaluation",
-            use_double_delta=True,
+            use_double_delta=True
         )
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
 
+    # If assigned as None, then it won't be taken into account
+    ASVSPOOF_DATASET_PATH = "../datasets/ASVspoof2021/LA"
+    WAVEFAKE_DATASET_PATH = "../datasets/WaveFake"
+    FAKEAVCELEB_DATASET_PATH = "../datasets/FakeAVCeleb/FakeAVCeleb_v1.2"
+
     parser.add_argument(
-        "--asv_path",
-        type=str,
-        default=None,
-        help="Path to ASVspoof2021 dataset directory",
+        "--asv_path", type=str, default=ASVSPOOF_DATASET_PATH
     )
     parser.add_argument(
-        "--wavefake_path",
-        type=str,
-        default=None,
-        help="Path to WaveFake dataset directory",
+        "--wavefake_path", type=str, default=WAVEFAKE_DATASET_PATH
     )
     parser.add_argument(
-        "--celeb_path",
-        type=str,
-        default=None,
-        help="Path to FakeAVCeleb dataset directory",
+        "--celeb_path", type=str, default=FAKEAVCELEB_DATASET_PATH
     )
 
     default_model_config = "config.yaml"
     parser.add_argument(
-        "--config",
-        help="Model config file path (default: config.yaml)",
-        type=str,
-        default=default_model_config,
-    )
+        "--config", help="Model config file path (default: config.yaml)", type=str, default=default_model_config)
 
     default_amount = None
     parser.add_argument(
-        "--amount",
-        "-a",
-        help=(
-            "Amount of files to load from each directory "
-            f"(default: {default_amount} - use all)."
-        ),
-        type=int,
-        default=default_amount,
-    )
+        "--amount", "-a", help=f"Amount of files to load from each directory (default: {default_amount} - use all).", type=int, default=default_amount)
 
     parser.add_argument(
-        "--cpu",
-        "-c",
-        help="Force using cpu",
-        action="store_true",
-    )
+        "--cpu", "-c", help="Force using cpu", action="store_true")
 
     parser.add_argument(
-        "--use_gmm",
-        help="[GMM] Use to evaluate GMM, otherwise - NNs",
-        action="store_true",
+        "--use_gmm", help="[GMM] Use to evaluate GMM, otherwise - NNs", action="store_true"
     )
 
     default_k = 128
     parser.add_argument(
-        "--clusters",
-        "-k",
-        help=f"[GMM] The amount of clusters to learn (default: {default_k}).",
-        type=int,
-        default=default_k,
+        "--clusters", "-k", help=f"[GMM] The amount of clusters to learn (default: {default_k}).", type=int, default=default_k
     )
     parser.add_argument(
-        "--lfcc",
-        "-l",
-        help="[GMM] Use LFCC instead of MFCC?",
-        action="store_true",
+        "--lfcc", "-l", help="[GMM] Use LFCC instead of MFCC?", action="store_true"
     )
 
     parser.add_argument(
-        "--output",
-        "-o",
-        help="[GMM] Output file name.",
-        type=str,
-        default="results",
+        "--output", "-o", help="[GMM] Output file name.", type=str, default="results"
     )
 
     default_model_dir = "trained_models"
     parser.add_argument(
-        "--ckpt",
-        help=f"[GMM] Checkpoint directory (default: {default_model_dir}).",
-        type=str,
-        default=default_model_dir,
-    )
+        "--ckpt", help=f"[GMM] Checkpoint directory (default: {default_model_dir}).", type=str, default=default_model_dir)
 
     return parser.parse_args()
 
