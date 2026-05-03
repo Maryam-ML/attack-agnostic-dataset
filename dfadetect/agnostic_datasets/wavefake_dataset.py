@@ -1,4 +1,11 @@
-from pathlib WAVEFAKE_KFOLD_SPLIT = {
+from pathlib import Path
+
+import pandas as pd
+
+from dfadetect.agnostic_datasets.base_dataset import SimpleAudioFakeDataset
+
+
+WAVEFAKE_KFOLD_SPLIT = {
     0: {
         "train": ['melgan_large', 'waveglow', 'full_band_melgan', 'melgan', 'hifiGAN'],
         "test": ['multi_band_melgan'],
@@ -20,14 +27,7 @@ from pathlib WAVEFAKE_KFOLD_SPLIT = {
         "bonafide_partition": [0.7, 0.15],
         "seed": 44
     }
-}import Path
-
-import pandas as pd
-
-from dfadetect.agnostic_datasets.base_dataset import SimpleAudioFakeDataset
-
-
-
+}
 
 
 class WaveFakeDataset(SimpleAudioFakeDataset):
