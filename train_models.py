@@ -10,10 +10,10 @@ import yaml
 
 from dfadetect.agnostic_datasets.attack_agnostic_dataset import AttackAgnosticDataset
 from dfadetect.cnn_features import CNNFeaturesSetting
-from dfadetect.datasets import apply_feature_and_double_delta, lfcc, mfcc
+#from dfadetect.datasets import apply_feature_and_double_delta, lfcc, mfcc
 from dfadetect.models import models
-from dfadetect.models.gaussian_mixture_model import GMMDescent, flatten_dataset
-from dfadetect.trainer import GDTrainer, GMMTrainer, NNDataSetting
+#from dfadetect.models.gaussian_mixture_model import GMMDescent, flatten_dataset
+from dfadetect.trainer import GDTrainer, NNDataSetting #, GMMTrainer
 from dfadetect.utils import set_seed
 from experiment_config import feature_kwargs
 
@@ -74,9 +74,9 @@ def train_nn(
 
     for fold in range(folds_number):
         data_train = AttackAgnosticDataset(
-            asvspoof_path=datasets_paths[0],
+            #asvspoof_path=datasets_paths[0],
             wavefake_path=datasets_paths[1],
-            fakeavceleb_path=datasets_paths[2],
+            #fakeavceleb_path=datasets_paths[2],
             fold_num=fold,
             fold_subset="train",
             reduced_number=amount_to_use,
@@ -84,9 +84,9 @@ def train_nn(
         )
 
         data_test = AttackAgnosticDataset(
-            asvspoof_path=datasets_paths[0],
+            #asvspoof_path=datasets_paths[0],
             wavefake_path=datasets_paths[1],
-            fakeavceleb_path=datasets_paths[2],
+            #fakeavceleb_path=datasets_paths[2],
             fold_num=fold,
             fold_subset="test",
             reduced_number=amount_to_use,
@@ -143,8 +143,8 @@ def train_gmm(
     for fold in range(3):
         real_dataset_train = AttackAgnosticDataset(
             asvspoof_path=datasets_paths[0],
-            wavefake_path=datasets_paths[1],
-            fakeavceleb_path=datasets_paths[2],
+            #wavefake_path=datasets_paths[1],
+            #fakeavceleb_path=datasets_paths[2],
             fold_num=fold,
             fold_subset="train",
             oversample=False,
