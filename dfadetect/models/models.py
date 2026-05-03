@@ -7,7 +7,7 @@ def get_model(model_name: str, config: Dict, device:str):
     elif model_name == "mesonet_inception":
         return mesonet.MesoInception4(num_classes=1, **config)
     elif model_name == "lcnn":
-        return LCNN(**config)
+        return lcnn.LCNN(**config)
     elif model_name == "xception":
         return xception.xception(num_classes=1, pretrained=None, **config)
     else:
