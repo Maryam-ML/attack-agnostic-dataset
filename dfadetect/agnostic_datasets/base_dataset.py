@@ -3,17 +3,13 @@ import random
 import numpy as np
 import pandas as pd
 import soundfile as sf
-import torch
 import torchaudio
 from torch.utils.data import Dataset
 #from torch.utils.data.dataset import T_co
-#from torch.utils.data.dataset import _T_co as T_co
-from typing import Any
 
 from dfadetect.datasets import AudioDataset, PadDataset
 
-
-WAVE_FAKE_INTERFACE = False
+WAVE_FAKE_INTERFACE = True
 WAVE_FAKE_SR = 16_000
 WAVE_FAKE_TRIM = True
 WAVE_FAKE_NORMALIZE = True
@@ -55,7 +51,7 @@ class SimpleAudioFakeDataset(Dataset):
         self.samples = tuple_samples
         return self.samples
 
-    def __getitem__(self, index) -> Any:
+    def __getitem__(self, index):
 
         if isinstance(self.samples, pd.DataFrame):
             sample = self.samples.iloc[index]
@@ -91,18 +87,7 @@ class SimpleAudioFakeDataset(Dataset):
             else:
                 return waveform, sample_rate
 
-        # Load audio with soundfile
         data, sr = sf.read(path)
-        
-        # CRITICAL FIX: Limit audio length to prevent GPU OOM
-        # Limit to 4 seconds at 16kHz = 64000 samples
-        max_samples = 64000
-        if len(data) > max_samples:
-            # Take first 4 seconds only
-            data = data[:max_samples]
-        
-        # Convert to torch tensor
-        data = torch.from_numpy(data).float()
 
         if self.transform:
             data = self.transform(data)
