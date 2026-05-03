@@ -9,7 +9,10 @@ import torch
 from torch.utils.data import DataLoader
 
 from dfadetect import cnn_features
-from dfadetect.datasets import TransformDataset
+#from dfadetect.datasets import TransformDataset
+
+import os
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 LOGGER = logging.getLogger(__name__)
 
@@ -47,100 +50,6 @@ class Trainer():
         self.epoch_test_losses: List[float] = []
 
 
-class GMMTrainer(Trainer):
-
-    # TODO: return TrainingResult
-    # TODO: Make generic to work with something else than GMM
-    def train(self,
-              model: torch.nn.Module,
-              dataset: TransformDataset,
-              logging_prefix: str = "",
-              test_len: float = 0.2,
-              ) -> torch.nn.Module:
-        """Fit the model given the training data.
-
-        Args:
-            model (torch.nn.Module): The model to be fitted.
-            loss_fn (Callable): A callable implementing the loss function.
-            dataset (torch.utils.Dataset): The dataset for fitting.
-            test_len (float): The percentage of data to be used for testing.
-
-        Returns:
-            The trained model.
-        """
-
-        model = model.to(self.device)
-        model.train()
-
-        test_len = int(len(dataset) * test_len)
-        train_len = len(dataset) - test_len
-        lengths = [train_len, test_len]
-        train, test = torch.utils.data.random_split(dataset, lengths)
-
-        # We force batch size as one and assume the different frames of an audio file
-        # to be one batch
-        train_loader = torch.utils.data.DataLoader(
-            train, batch_size=1, shuffle=True)
-        test_loader = torch.utils.data.DataLoader(
-            test, batch_size=1)
-
-        optimizer = self.optimizer_fn(
-            model.parameters(), **self.optimizer_kwargs)
-        LOGGER.info(f"Starting training of {logging_prefix} for {self.epochs} epochs!")
-
-        for epoch in range(1, self.epochs + 1):
-
-            train_epoch_running = True
-            train_iter = iter(train_loader)
-            i = 0
-
-            while train_epoch_running:
-                # construct batch by merging files
-                batch = []
-                for _ in range(self.batch_size):
-                    try:
-                        audio_file, _ = next(train_iter)
-                        audio_file = audio_file.view(
-                            audio_file.shape[-2:]).T
-                        batch.append(audio_file)
-
-                    except StopIteration:
-                        train_epoch_running = False
-                i += 1
-                if len(batch) == 0:
-                    break
-                batch = torch.cat(batch)
-
-                batch = batch.to(self.device)
-                pred = model(batch)
-                train_loss = - pred.mean()  # negative log likelihood
-
-                # Backpropagation
-                optimizer.zero_grad()
-                train_loss.backward()
-                optimizer.step()
-
-                model._build_distributions()
-                if i % 1_00 == 0:
-                    LOGGER.info(
-                        f"[{epoch:05}] Current batch loss: {train_loss.item(): 4.3f} [{i:05}/{int(len(train)/self.batch_size):05}]")
-
-            LOGGER.info(f"Epoch [{epoch}/{self.epochs}]: train/{logging_prefix}__loss: {train_loss.item()}")
-            test_loss: List[float] = []
-            for audio_file, _ in test_loader:
-                # unpack double batching (dataset + dataloader) and reorder to (time, feat)
-                audio_file = audio_file.view(
-                    audio_file.shape[-2:]).T.to(self.device)
-                test_loss.append((-model(audio_file).mean()).item())
-
-            test_loss: float = np.mean(test_loss)
-            LOGGER.info(f"Epoch [{epoch}/{self.epochs}]: test/{logging_prefix}__loss: {test_loss}")
-            LOGGER.debug(f"[{epoch:05}] Epoch test loss: {test_loss: 3.3f}")
-            self.epoch_test_losses.append(test_loss)
-
-        model.eval()
-        return model
-
 def forward_and_loss(model, criterion, batch_x, batch_y, **kwargs):
     batch_out = model(batch_x)
     batch_loss = criterion(batch_out, batch_y)
@@ -174,13 +83,14 @@ class GDTrainer(Trainer):
             batch_size=self.batch_size,
             shuffle=True,
             drop_last=True,
-            num_workers=6,
+            num_workers=4,
+            pin_memory=True,
         )
         test_loader = DataLoader(
             test,
             batch_size=self.batch_size,
             drop_last=True,
-            num_workers=6,
+            num_workers=4,
         )
 
         criterion = torch.nn.BCEWithLogitsLoss()
@@ -222,7 +132,7 @@ class GDTrainer(Trainer):
 
                 if i % 100 == 0:
                     LOGGER.info(
-                         f"[{epoch:04d}][{i:05d}]: {running_loss / num_total} {num_correct/num_total*100}")
+                         f"[Epoch {epoch:04d}] [Step {i:05d}] | Loss: {running_loss / num_total:.4f} | Acc: {num_correct / num_total * 100:.2f}%")
 
                 optim.zero_grad()
                 batch_loss.backward()
@@ -232,43 +142,45 @@ class GDTrainer(Trainer):
             train_accuracy = (num_correct/num_total)*100
 
             LOGGER.info(f"Epoch [{epoch+1}/{self.epochs}]: train/{logging_prefix}__loss: {running_loss}, train/{logging_prefix}__accuracy: {train_accuracy}")
+            torch.cuda.empty_cache()
 
             test_running_loss = 0.0
             num_correct = 0.0
             num_total = 0.0
             model.eval()
-            for batch_x, _, batch_y in test_loader:
+            with torch.no_grad():
+                for batch_x, _, batch_y in test_loader:
+    
+                    batch_size = batch_x.size(0)
+                    num_total += batch_size
+                    batch_x = batch_x.to(self.device)
+    
+                    if nn_data_setting.use_cnn_features:
+                        batch_x = cnn_features.prepare_feature_vector(batch_x, cnn_features_setting=cnn_features_setting)
+    
+                    batch_y = batch_y.unsqueeze(1).type(torch.float32).to(self.device)
+                    batch_out = model(batch_x)
+                    batch_loss = criterion(batch_out, batch_y)
+    
+                    test_running_loss += (batch_loss.item() * batch_size)
+    
+                    batch_pred = (torch.sigmoid(batch_out) + .5).int()
+                    num_correct += (batch_pred == batch_y.int()).sum(dim=0).item()
+    
+                if num_total == 0:
+                    num_total = 1
+    
+                test_running_loss /= num_total
+                test_acc = 100 * (num_correct / num_total)
+                LOGGER.info(f"Epoch [{epoch+1}/{self.epochs}]: test/{logging_prefix}__loss: {test_running_loss}, test/{logging_prefix}__accuracy: {test_acc}")
 
-                batch_size = batch_x.size(0)
-                num_total += batch_size
-                batch_x = batch_x.to(self.device)
 
-                if nn_data_setting.use_cnn_features:
-                    batch_x = cnn_features.prepare_feature_vector(batch_x, cnn_features_setting=cnn_features_setting)
-
-                batch_y = batch_y.unsqueeze(1).type(torch.float32).to(self.device)
-                batch_out = model(batch_x)
-                batch_loss = criterion(batch_out, batch_y)
-
-                test_running_loss += (batch_loss.item() * batch_size)
-
-                batch_pred = (torch.sigmoid(batch_out) + .5).int()
-                num_correct += (batch_pred == batch_y.int()).sum(dim=0).item()
-
-            if num_total == 0:
-                num_total = 1
-
-            test_running_loss /= num_total
-            test_acc = 100 * (num_correct / num_total)
-            LOGGER.info(f"Epoch [{epoch+1}/{self.epochs}]: test/{logging_prefix}__loss: {test_running_loss}, test/{logging_prefix}__accuracy: {test_acc}")
-
-
-            if best_model is None or test_acc > best_acc:
-                best_acc = test_acc
-                best_model = deepcopy(model.state_dict())
-
-            LOGGER.info(
-                f"[{epoch:04d}]: {running_loss} - train acc: {train_accuracy} - test_acc: {test_acc}")
+                if best_model is None or test_acc > best_acc:
+                    best_acc = test_acc
+                    best_model = deepcopy(model.state_dict())
+    
+                LOGGER.info(
+                    f"[{epoch:04d}]: {running_loss} -- train acc: {train_accuracy} -- test_acc: {test_acc}")
 
         model.load_state_dict(best_model)
         return model
