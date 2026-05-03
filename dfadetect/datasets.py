@@ -8,8 +8,8 @@ import torch
 import torchaudio
 #from torchaudio.functional import apply_codec
 
-from dfadetect.lfcc import LFCC
-from dfadetect.utils import find_wav_files
+#from dfadetect.lfcc import LFCC
+#from dfadetect.utils import find_wav_files
 
 LOGGER = logging.getLogger(__name__)
 
@@ -71,7 +71,7 @@ class AudioDataset(torch.utils.data.Dataset):
         path = self._paths[index]
 
         waveform, sample_rate = torchaudio.load(path, normalize=self.normalize)
- 
+
         if sample_rate != self.sample_rate:
             waveform, sample_rate = self.resample(path, self.sample_rate, self.normalize)
 
@@ -101,20 +101,8 @@ class AudioDataset(torch.utils.data.Dataset):
 
         return waveform, sample_rate
 
-    @staticmethod
-    def process_phone_call(waveform, sample_rate):
-        waveform, sample_rate = torchaudio.sox_effects.apply_effects_tensor(
-            waveform,
-            sample_rate,
-            effects=[
-                ["lowpass", "4000"],
-                ["compand", "0.02,0.05",
-                 "-60,-60,-30,-10,-20,-8,-5,-8,-2,-8", "-8", "-7", "0.05"],
-                ["rate", "8000"],
-            ],
-        )
-        waveform = apply_codec(waveform, sample_rate, format="gsm")
-        return waveform, sample_rate
+
+
 
     def __len__(self) -> int:
         return len(self._paths)
@@ -150,208 +138,7 @@ class PadDataset(torch.utils.data.Dataset):
 
         return padded_waveform
 
+
+
     def __len__(self):
         return len(self.dataset)
-
-
-class TransformDataset(torch.utils.data.Dataset):
-    """A generic transformation dataset.
-
-    Takes another dataset as input, which provides the base input.
-    When retrieving an item from the dataset, the provided transformation gets applied.
-
-    Args:
-        dataset: A dataset which return a (waveform, sample_rate)-pair.
-        transformation: The torchaudio transformation to use.
-        needs_sample_rate: Does the transformation need the sampling rate?
-        transform_kwargs: Kwargs for the transformation.
-    """
-
-    def __init__(
-            self,
-            dataset: torch.utils.data.Dataset,
-            transformation: Callable,
-            needs_sample_rate: bool = False,
-            transform_kwargs: dict = {},
-    ) -> None:
-        super().__init__()
-        self._dataset = dataset
-
-        self._transform_constructor = transformation
-        self._needs_sample_rate = needs_sample_rate
-        self._transform_kwargs = transform_kwargs
-
-        self._transform = None
-
-    def __len__(self):
-        return len(self._dataset)
-
-    def __getitem__(self, index: int) -> Tuple[torch.Tensor, int]:
-        waveform, sample_rate = self._dataset[index]
-
-        if self._transform is None:
-            if self._needs_sample_rate:
-                self._transform = self._transform_constructor(
-                    sample_rate, **self._transform_kwargs)
-            else:
-                self._transform = self._transform_constructor(
-                    **self._transform_kwargs)
-
-        return self._transform(waveform), sample_rate
-
-
-class DoubleDeltaTransform(torch.nn.Module):
-    """A transformation to compute delta and double delta features.
-
-    Args:
-        win_length (int): The window length to use for computing deltas (Default: 5).
-        mode (str): Mode parameter passed to padding (Default: replicate).
-    """
-
-    def __init__(
-            self,
-            win_length: int = 5,
-            mode: str = "replicate"
-    ) -> None:
-        super().__init__()
-        self.win_length = win_length
-        self.mode = mode
-
-        self._delta = torchaudio.transforms.ComputeDeltas(
-            win_length=self.win_length, mode=self.mode)
-
-    def forward(self, X):
-        """
-        Args:
-             specgram (Tensor): Tensor of audio of dimension (..., freq, time).
-        Returns:
-            Tensor: specgram, deltas and double deltas of size (..., 3*freq, time).
-        """
-        delta = self._delta(X)
-        double_delta = self._delta(delta)
-
-        return torch.hstack((X, delta, double_delta))
-
-
-# =====================================================================
-# Helper functions.
-# =====================================================================
-
-
-def _build_preprocessing(
-        directory_or_audiodataset: Union[Union[str, Path], AudioDataset],
-        transform: torch.nn.Module,
-        audiokwargs: dict = {},
-        transformkwargs: dict = {},
-) -> TransformDataset:
-    import dfadetect.agnostic_datasets.attack_agnostic_dataset as aa_ds
-    """Generic function template for building preprocessing functions.
-    """
-    if (
-            isinstance(directory_or_audiodataset, AudioDataset)
-            or isinstance(directory_or_audiodataset, PadDataset)
-            or isinstance(directory_or_audiodataset, aa_ds.AttackAgnosticDataset)
-    ):
-        return TransformDataset(dataset=directory_or_audiodataset,
-                                transformation=transform,
-                                needs_sample_rate=True,
-                                transform_kwargs=transformkwargs)
-    elif isinstance(directory_or_audiodataset, str) or isinstance(directory_or_audiodataset, Path):
-        return TransformDataset(dataset=AudioDataset(directory=directory_or_audiodataset, **audiokwargs),
-                                transformation=transform,
-                                needs_sample_rate=True,
-                                transform_kwargs=transformkwargs)
-    else:
-        raise TypeError("Unsupported type for directory_or_audiodataset!")
-
-
-mfcc = functools.partial(_build_preprocessing,
-                         transform=torchaudio.transforms.MFCC)
-lfcc = functools.partial(_build_preprocessing, transform=LFCC)
-
-
-def double_delta(dataset: torch.utils.data.Dataset, delta_kwargs: dict = {}) -> TransformDataset:
-    return TransformDataset(dataset=dataset, transformation=DoubleDeltaTransform, transform_kwargs=delta_kwargs)
-
-
-def load_directory_split_train_test(
-        path: Union[Path, str],
-        feature_fn: Callable,
-        feature_kwargs: dict,
-        test_size: float,
-        use_double_delta: bool = True,
-        phone_call: bool = False,
-        pad: bool = True,
-        label: Optional[int] = None,
-        amount_to_use: Optional[int] = None,
-) -> Tuple[TransformDataset, TransformDataset]:
-    """Load all wav files from directory, apply the feature transformation
-    and split into test/train.
-
-    Args:
-        path (Union[Path, str]): Path to directory.
-        feature_fn (Callable): This is assumed to be mfcc or lfcc function.
-        feature_fn (dict): Kwargs for the feature_fn.
-        test_size (float): Ratio of train/test split.
-        use_double_delta (bool): Additionally calculate delta and double delta features (Default True)?
-        amount_to_use (Optional[int]): If supplied, limit data.
-    """
-    paths = find_wav_files(path)
-    if paths is None:
-        raise IOError(f"Could not load files from {path}!")
-
-    if amount_to_use is not None:
-        paths = paths[:amount_to_use]
-
-    test_size = int(test_size * len(paths))
-
-    train_paths = paths[:-test_size]
-    test_paths = paths[-test_size:]
-
-    LOGGER.info(f"Loading data from {path}...!")
-
-    train_dataset = AudioDataset(
-        train_paths, phone_call=phone_call)
-    if pad:
-        train_dataset = PadDataset(train_dataset, label=label)
-
-    test_dataset = AudioDataset(
-        test_paths, phone_call=phone_call)
-    if pad:
-        test_dataset = PadDataset(test_dataset, label=label)
-
-    if feature_fn is None:
-        return train_dataset, test_dataset
-
-    dataset_train = feature_fn(
-        directory_or_audiodataset=train_dataset,
-        transformkwargs=feature_kwargs
-    )
-
-    dataset_test = feature_fn(
-        directory_or_audiodataset=test_dataset,
-        transformkwargs=feature_kwargs
-    )
-    if use_double_delta:
-        dataset_train = double_delta(dataset_train)
-        dataset_test = double_delta(dataset_test)
-
-    return dataset_train, dataset_test
-
-
-def apply_feature_and_double_delta(
-        datasets: List[torch.utils.data.Dataset],
-        feature_fn: Callable,
-        feature_kwargs: dict,
-        use_double_delta: bool = True
-):
-
-    datasets_list = []
-    for ds in datasets:
-        ds = feature_fn(directory_or_audiodataset=ds, transformkwargs=feature_kwargs)
-        if use_double_delta:
-            ds = double_delta(ds)
-
-        datasets_list.append(ds)
-
-    return datasets_list
