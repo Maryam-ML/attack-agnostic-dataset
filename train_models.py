@@ -124,6 +124,10 @@ def train_nn(
         LOGGER.info(f"Training model on fold [{fold+1}/{folds_number}] done!")
 
 
+def train_gmm(
+        LOGGER.info("Training fake model done!")
+
+
 def main(args):
     logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
