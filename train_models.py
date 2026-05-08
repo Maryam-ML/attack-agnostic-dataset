@@ -10,10 +10,10 @@ import yaml
 
 from dfadetect.agnostic_datasets.attack_agnostic_dataset import AttackAgnosticDataset
 from dfadetect.cnn_features import CNNFeaturesSetting
-#from dfadetect.datasets import apply_feature_and_double_delta, lfcc, mfcc
+from dfadetect.datasets import apply_feature_and_double_delta, lfcc, mfcc
 from dfadetect.models import models
-#from dfadetect.models.gaussian_mixture_model import GMMDescent, flatten_dataset
-from dfadetect.trainer import GDTrainer, NNDataSetting #, GMMTrainer
+from dfadetect.models.gaussian_mixture_model import GMMDescent, flatten_dataset
+from dfadetect.trainer import GDTrainer, GMMTrainer, NNDataSetting
 from dfadetect.utils import set_seed
 from experiment_config import feature_kwargs
 
@@ -74,8 +74,8 @@ def train_nn(
 
     for fold in range(folds_number):
         data_train = AttackAgnosticDataset(
-            #asvspoof_path=datasets_paths[0],
-            #wavefake_path=datasets_paths[1],
+            asvspoof_path=datasets_paths[0],
+            wavefake_path=datasets_paths[1],
             fakeavceleb_path=datasets_paths[2],
             fold_num=fold,
             fold_subset="train",
@@ -84,8 +84,8 @@ def train_nn(
         )
 
         data_test = AttackAgnosticDataset(
-            #asvspoof_path=datasets_paths[0],
-            #wavefake_path=datasets_paths[1],
+            asvspoof_path=datasets_paths[0],
+            wavefake_path=datasets_paths[1],
             fakeavceleb_path=datasets_paths[2],
             fold_num=fold,
             fold_subset="test",
@@ -98,7 +98,6 @@ def train_nn(
         ).to(device)
 
         LOGGER.info(f"Training '{model_name}' model on {len(data_train)} audio files.")
-        LOGGER.info(f"Testing '{model_name}' model on {len(data_test)} audio files.")
 
         current_model = GDTrainer(
             device=device,
@@ -125,6 +124,84 @@ def train_nn(
 
 
 def train_gmm(
+    datasets_paths: List[Union[Path, str]],
+    feature_fn: Callable,
+    feature_kwargs: dict,
+    clusters: int,
+    batch_size: int,
+    device: str,
+    model_dir: Optional[Path] = None,
+    use_double_delta: bool = True,
+    amount_to_use: Optional[int] = None,
+    real_epochs: int = 3,
+    fake_epochs: int = 1
+) -> None:
+
+    LOGGER.info("Loading data...")
+
+    for fold in range(3):
+        real_dataset_train = AttackAgnosticDataset(
+            asvspoof_path=datasets_paths[0],
+            wavefake_path=datasets_paths[1],
+            fakeavceleb_path=datasets_paths[2],
+            fold_num=fold,
+            fold_subset="train",
+            oversample=False,
+            undersample=False,
+            return_label=False,
+            reduced_number=amount_to_use
+        )
+        real_dataset_train.get_bonafide_only()
+
+        fake_dataset_train = AttackAgnosticDataset(
+            asvspoof_path=datasets_paths[0],
+            wavefake_path=datasets_paths[1],
+            fakeavceleb_path=datasets_paths[2],
+            fold_num=fold,
+            fold_subset="train",
+            oversample=False,
+            undersample=False,
+            return_label=False,
+            reduced_number=amount_to_use
+        )
+        fake_dataset_train.get_spoof_only()
+
+        real_dataset_train, fake_dataset_train = apply_feature_and_double_delta(
+            [real_dataset_train, fake_dataset_train],
+            feature_fn=feature_fn,
+            feature_kwargs=feature_kwargs,
+            use_double_delta=use_double_delta
+        )
+
+        LOGGER.info(f"GMM - Training real model on {len(real_dataset_train)} audio files.")
+        inital_data = flatten_dataset(real_dataset_train, device, 10)
+        real_model = GMMDescent(clusters, inital_data, covariance_type="diag").to(device)
+        real_model = GMMTrainer(device=device, epochs=real_epochs, batch_size=batch_size).train(
+            real_model, real_dataset_train, test_len=0.05
+        )
+
+        if model_dir is not None:
+            save_model(
+                model=real_model,
+                model_dir=model_dir,
+                name=f"real_{fold}",
+            )
+        LOGGER.info("Training real model done!")
+
+        LOGGER.info(f"GMM - Training fake model on {len(fake_dataset_train)} audio files.")
+        inital_data = flatten_dataset(fake_dataset_train, device, 10)
+        fake_model = GMMDescent(clusters, inital_data, covariance_type="diag").to(device)
+        fake_model = GMMTrainer(device=device, epochs=fake_epochs, batch_size=batch_size).train(
+            fake_model, fake_dataset_train, test_len=.05
+        )
+
+        if model_dir is not None:
+            save_model(
+                model=fake_model,
+                model_dir=model_dir,
+                name=f"fake_{fold}",
+            )
+
         LOGGER.info("Training fake model done!")
 
 
