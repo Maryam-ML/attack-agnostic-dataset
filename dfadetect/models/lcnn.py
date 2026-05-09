@@ -161,7 +161,7 @@ class AttentiveStatisticsPooling(nn.Module):
 # Main model
 # ---------------------------------------------------------------------------
 
-class ImprovedLCNN(nn.Module):
+class LCNN(nn.Module):
     """
     Improved LCNN for audio anti-spoofing / deepfake detection.
 
