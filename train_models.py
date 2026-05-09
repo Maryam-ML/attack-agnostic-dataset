@@ -142,7 +142,7 @@ def train_gmm(
     for fold in range(3):
         real_dataset_train = AttackAgnosticDataset(
             #asvspoof_path=datasets_paths[0],
-            w#avefake_path=datasets_paths[1],
+            #wavefake_path=datasets_paths[1],
             fakeavceleb_path=datasets_paths[2],
             fold_num=fold,
             fold_subset="train",
