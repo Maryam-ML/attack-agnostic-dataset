@@ -74,9 +74,9 @@ def train_nn(
 
     for fold in range(folds_number):
         data_train = AttackAgnosticDataset(
-            #asvspoof_path=datasets_paths[0],
+            asvspoof_path=datasets_paths[0],
             #wavefake_path=datasets_paths[1],
-            fakeavceleb_path=datasets_paths[2],
+            #fakeavceleb_path=datasets_paths[2],
             fold_num=fold,
             fold_subset="train",
             reduced_number=amount_to_use,
@@ -84,9 +84,9 @@ def train_nn(
         )
 
         data_test = AttackAgnosticDataset(
-            #asvspoof_path=datasets_paths[0],
+            asvspoof_path=datasets_paths[0],
             #wavefake_path=datasets_paths[1],
-            fakeavceleb_path=datasets_paths[2],
+            #fakeavceleb_path=datasets_paths[2],
             fold_num=fold,
             fold_subset="test",
             reduced_number=amount_to_use,
@@ -98,6 +98,7 @@ def train_nn(
         ).to(device)
 
         LOGGER.info(f"Training '{model_name}' model on {len(data_train)} audio files.")
+        LOGGER.info(f"Testing '{model_name}' model on {len(data_test)} audio files.")
 
         current_model = GDTrainer(
             device=device,
@@ -146,7 +147,7 @@ def train_gmm(
             fakeavceleb_path=datasets_paths[2],
             fold_num=fold,
             fold_subset="train",
-            oversample=False,
+            oversample=True,
             undersample=False,
             return_label=False,
             reduced_number=amount_to_use
@@ -159,7 +160,7 @@ def train_gmm(
             fakeavceleb_path=datasets_paths[2],
             fold_num=fold,
             fold_subset="train",
-            oversample=False,
+            oversample=True,
             undersample=False,
             return_label=False,
             reduced_number=amount_to_use
