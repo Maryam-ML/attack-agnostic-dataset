@@ -1,23 +1,21 @@
 from dataclasses import dataclass, field
 from typing import List
-
 import torch
 import torchaudio
 
-
 @dataclass
 class CNNFeaturesSetting:
-    frontend_algorithm: List[str]= field(default_factory=lambda: ["mfcc"])
+    frontend_algorithm: List[str] = field(default_factory=lambda: ["mfcc"])
     use_spectrogram: bool = True
+    use_deltas: bool = True  # Added: Highly effective for catching fake voice transitions
 
-
-# values from FakeAVCeleb paper
 SAMPLING_RATE = 16_000
-win_length = 400  # int((25 / 1_000) * SAMPLING_RATE)
-hop_length = 160  # int((10 / 1_000) * SAMPLING_RATE)
+win_length = 400  
+hop_length = 160  
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
+# FIX 1: Explicitly pass "n_mels": 80 inside melkwargs to eliminate empty filterbanks
 MFCC_FN = torchaudio.transforms.MFCC(
     sample_rate=SAMPLING_RATE,
     n_mfcc=80,
@@ -25,9 +23,9 @@ MFCC_FN = torchaudio.transforms.MFCC(
         "n_fft": 512,
         "win_length": win_length,
         "hop_length": hop_length,
+        "n_mels": 80,  # Explicitly match your target dimension
     },
 ).to(device)
-
 
 LFCC_FN = torchaudio.transforms.LFCC(
     sample_rate=SAMPLING_RATE,
@@ -55,28 +53,34 @@ def prepare_feature_vector(
 
     feature_vector = []
 
+    # Extract base features
     if "mfcc" in cnn_features_setting.frontend_algorithm:
         mfcc_feature = MFCC_FN(audio)
         feature_vector.append(mfcc_feature)
+        if cnn_features_setting.use_deltas:
+            # Catch dynamic acceleration artifacts
+            feature_vector.append(torchaudio.functional.compute_deltas(mfcc_feature))
 
     if "lfcc" in cnn_features_setting.frontend_algorithm:
         lfcc_feature = LFCC_FN(audio)
         feature_vector.append(lfcc_feature)
+        if cnn_features_setting.use_deltas:
+            feature_vector.append(torchaudio.functional.compute_deltas(lfcc_feature))
 
     if cnn_features_setting.use_spectrogram:
-        stft_features = prepare_stft_features(audio, win_length, hop_length)
-        feature_vector += stft_features  # abs_mel, abs_angle
+        stft_abs_mel, stft_abs_angle = prepare_stft_features(audio, win_length, hop_length)
+        feature_vector.append(stft_abs_mel)
+        feature_vector.append(stft_abs_angle)
 
     assert len(feature_vector) >= 1, "Feature vector must contain at least one feature!"
 
+    # Ensure everything is neatly aligned and stack along the channel dimension
+    # Format: [batch_size, feature_num, 80, frames]
     feature_vector = torch.stack(feature_vector, dim=1)
-
-    # [batch_size, feature_num, 80, frames], where feature_num in {1,2,3,4}
     return feature_vector
 
 
 def prepare_stft_features(audio, win_length, hop_length):
-    # Run STFT
     stft_out = torch.stft(
         audio,
         n_fft=512,
@@ -85,11 +89,20 @@ def prepare_stft_features(audio, win_length, hop_length):
         win_length=win_length,
     )
 
-    # Reduce dimensionality via use of mel filterbanks
-    stft_real_mel = MEL_SCALE_FN(stft_out.real)
-    stft_imag_mel = MEL_SCALE_FN(stft_out.imag)
+    # FIX 2: Compute magnitude and phase directly on the true complex tensor FIRST
+    magnitude = torch.abs(stft_out)
+    phase = torch.angle(stft_out)
 
-    complex_tensor = torch.complex(stft_real_mel, stft_imag_mel)
-    stft_abs_mel = complex_tensor.abs()
-    stft_abs_angle = complex_tensor.angle()
+    # Apply Mel scale cleanly to the clean magnitude values
+    stft_abs_mel = MEL_SCALE_FN(magnitude)
+
+    # Downsample phase linearly to match the (80, frames) shape requirement 
+    # instead of passing it through a Mel filter matrix which destroys it
+    stft_abs_angle = torch.nn.functional.interpolate(
+        phase.unsqueeze(1), 
+        size=(80, phase.shape[-1]), 
+        mode='bilinear', 
+        align_corners=False
+    ).squeeze(1)
+
     return stft_abs_mel, stft_abs_angle
