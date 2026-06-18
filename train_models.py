@@ -99,6 +99,7 @@ def train_nn(
         ).to(device)
 
         LOGGER.info(f"Training '{model_name}' model on {len(data_train)} audio files.")
+        LOGGER.info(f"validation'{model_name}' model on {len(data_test)} audio files.") 
 
         current_model = GDTrainer(
             device=device,
