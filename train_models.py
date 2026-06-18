@@ -13,9 +13,12 @@ from dfadetect.cnn_features import CNNFeaturesSetting
 #from dfadetect.datasets import apply_feature_and_double_delta, lfcc, mfcc
 from dfadetect.models import models
 #from dfadetect.models.gaussian_mixture_model import GMMDescent, flatten_dataset
-from dfadetect.trainer import GDTrainer,NNDataSetting #, GMMTrainer,
+from dfadetect.trainer import GDTrainer, NNDataSetting #, GMMTrainer
 from dfadetect.utils import set_seed
 from experiment_config import feature_kwargs
+#from dfadetect.cnn_features import CNNFeaturesSetting, count_input_channels
+#cfg = CNNFeaturesSetting(frontend_algorithm=["lfcc"], use_spectrogram=False)
+#print(count_input_channels(cfg))  # → 1
 
 LOGGER = logging.getLogger()
 
@@ -80,17 +83,20 @@ def train_nn(
             fold_num=fold,
             fold_subset="train",
             reduced_number=amount_to_use,
-            oversample=True,
+            oversample=args.oversample,
+            undersample=args.undersample,
+            reduced_number=args.reduced_number,
         )
 
         data_test = AttackAgnosticDataset(
+            
             asvspoof_path=datasets_paths[0],
             wavefake_path=datasets_paths[1],
             fakeavceleb_path=datasets_paths[2],
             fold_num=fold,
             fold_subset="test",
             reduced_number=amount_to_use,
-            oversample=True,
+            
         )
 
         current_model = models.get_model(
@@ -98,7 +104,7 @@ def train_nn(
         ).to(device)
 
         LOGGER.info(f"Training '{model_name}' model on {len(data_train)} audio files.")
-        LOGGER.info(f"Testing '{model_name}' model on {len(data_test)} audio files.")
+        LOGGER.info(f"Validation '{model_name}' model on {len(data_test)} audio files.")
 
         current_model = GDTrainer(
             device=device,
@@ -122,6 +128,12 @@ def train_nn(
                 name=save_name,
             )
         LOGGER.info(f"Training model on fold [{fold+1}/{folds_number}] done!")
+
+
+
+
+
+
 
 
 
@@ -222,6 +234,30 @@ def parse_args():
 
     parser.add_argument(
         "--verbose", "-v", help="Display debug information?", action="store_true")
+    # Oversample (default: True — matches your current AttackAgnosticDataset default)
+    parser.add_argument(
+        "--oversample",
+        help="Oversample bonafide class to match spoof count? (default: True)",
+        action="store_true",
+        default=True
+    )
+    
+    # Undersample (default: False)
+    parser.add_argument(
+        "--undersample",
+        help="Undersample spoof class to match bonafide count? (default: False)",
+        action="store_true",
+        default=False
+    )
+    
+    # Reduced number
+    default_reduced_number = None
+    parser.add_argument(
+        "--reduced_number", "-r",
+        help=f"Limit total dataset samples per fold — useful for large datasets (default: {default_reduced_number} - use all).",
+        type=int,
+        default=default_reduced_number
+    )
 
     # GMM arguments
     parser.add_argument(
