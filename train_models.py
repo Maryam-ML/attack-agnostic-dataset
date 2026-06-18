@@ -10,15 +10,12 @@ import yaml
 
 from dfadetect.agnostic_datasets.attack_agnostic_dataset import AttackAgnosticDataset
 from dfadetect.cnn_features import CNNFeaturesSetting
-#from dfadetect.datasets import apply_feature_and_double_delta, lfcc, mfcc
+from dfadetect.datasets import apply_feature_and_double_delta, lfcc, mfcc
 from dfadetect.models import models
-#from dfadetect.models.gaussian_mixture_model import GMMDescent, flatten_dataset
-from dfadetect.trainer import GDTrainer, NNDataSetting #, GMMTrainer
+from dfadetect.models.gaussian_mixture_model import GMMDescent, flatten_dataset
+from dfadetect.trainer import GDTrainer, GMMTrainer, NNDataSetting
 from dfadetect.utils import set_seed
 from experiment_config import feature_kwargs
-#from dfadetect.cnn_features import CNNFeaturesSetting, count_input_channels
-#cfg = CNNFeaturesSetting(frontend_algorithm=["lfcc"], use_spectrogram=False)
-#print(count_input_channels(cfg))  # → 1
 
 LOGGER = logging.getLogger()
 
@@ -59,8 +56,6 @@ def train_nn(
     device: str,
     model_config: Dict,
     cnn_features_setting: CNNFeaturesSetting,
-    oversample: bool = False,
-    undersample: bool = False,
     model_dir: Optional[Path] = None,
     amount_to_use: Optional[int] = None,
 ) -> None:
@@ -85,20 +80,17 @@ def train_nn(
             fold_num=fold,
             fold_subset="train",
             reduced_number=amount_to_use,
-            oversample=oversample ,
-            undersample= undersample,
-
+            oversample=True,
         )
 
         data_test = AttackAgnosticDataset(
-            
             asvspoof_path=datasets_paths[0],
             wavefake_path=datasets_paths[1],
             fakeavceleb_path=datasets_paths[2],
             fold_num=fold,
             fold_subset="test",
             reduced_number=amount_to_use,
-            
+            oversample=True,
         )
 
         current_model = models.get_model(
@@ -106,7 +98,6 @@ def train_nn(
         ).to(device)
 
         LOGGER.info(f"Training '{model_name}' model on {len(data_train)} audio files.")
-        LOGGER.info(f"Validation '{model_name}' model on {len(data_test)} audio files.")
 
         current_model = GDTrainer(
             device=device,
@@ -130,13 +121,6 @@ def train_nn(
                 name=save_name,
             )
         LOGGER.info(f"Training model on fold [{fold+1}/{folds_number}] done!")
-
-
-
-
-
-
-
 
 
 def main(args):
@@ -176,9 +160,6 @@ def main(args):
             model_dir=model_dir,
             model_config=config["model"],
             cnn_features_setting=cnn_features_setting,
-            oversample=args.oversample,
-            undersample=args.undersample,
-            
         )
     else:
         feature_fn = lfcc if args.lfcc else mfcc
@@ -239,21 +220,6 @@ def parse_args():
 
     parser.add_argument(
         "--verbose", "-v", help="Display debug information?", action="store_true")
-
-    parser.add_argument(
-        "--oversample",
-        help="Oversample bonafide class to match spoof count?",
-        action=argparse.BooleanOptionalAction,
-        default=True
-    )
-    
-    parser.add_argument(
-        "--undersample",
-        help="Undersample spoof class to match bonafide count?",
-        action=argparse.BooleanOptionalAction,
-        default=False
-    )
-    
 
     # GMM arguments
     parser.add_argument(
