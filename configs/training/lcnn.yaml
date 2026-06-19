@@ -11,5 +11,7 @@ model:
   name: "lcnn"
   parameters:
     input_channels: 1
+    use_spec_augment: False
+    use_checkpoint: False
   optimizer:
     lr: 0.0001
