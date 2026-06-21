@@ -80,8 +80,8 @@ def train_nn(
             fold_num=fold,
             fold_subset="train",
             reduced_number=amount_to_use,
-            oversample=False, 
-            undersample=True,
+            oversample=True, 
+            undersample=False,
         )
 
         data_test = AttackAgnosticDataset(
