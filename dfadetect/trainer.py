@@ -1,20 +1,19 @@
 """A generic training wrapper."""
 import logging
+import os
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import Callable, List, Optional
 
-import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
 from dfadetect import cnn_features
-#from dfadetect.datasets import TransformDataset
 
-import os
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 LOGGER = logging.getLogger(__name__)
+
 
 @dataclass
 class NNDataSetting:
@@ -30,9 +29,8 @@ class Trainer():
         epochs (int): The amount of training epochs.
         batch_size (int): Amount of audio files to use in one batch.
         device (str): The device to train on (Default 'cpu').
-        batch_size (int): The amount of audio files to consider in one batch (Default: 32).
-        optimizer_fn (Callable): Function for constructing the optimzer.
-        optimizer_kwargs (dict): Kwargs for the optimzer.
+        optimizer_fn (Callable): Function for constructing the optimizer.
+        optimizer_kwargs (dict): Kwargs for the optimizer.
     """
 
     def __init__(self,
@@ -68,6 +66,7 @@ class GDTrainer(Trainer):
         test_dataset: Optional[torch.utils.data.Dataset] = None,
         logging_prefix: str = "",
         pos_weight: Optional[torch.FloatTensor] = None,
+        checkpoint_dir: Optional[str] = None,
     ):
         if test_dataset is not None:
             train = dataset
@@ -91,24 +90,23 @@ class GDTrainer(Trainer):
             batch_size=self.batch_size,
             drop_last=True,
             num_workers=4,
+            pin_memory=True,
         )
 
         criterion = torch.nn.BCEWithLogitsLoss()
         optim = self.optimizer_fn(model.parameters(), **self.optimizer_kwargs)
 
         best_model = None
-        best_acc = 0
+        best_acc = 0.0
 
         LOGGER.info(f"Starting training for {self.epochs} epochs!")
-
         forward_and_loss_fn = forward_and_loss
-
         use_cuda = self.device != "cpu"
 
         for epoch in range(self.epochs):
             LOGGER.info(f"Epoch num: {epoch}")
 
-            running_loss = 0
+            running_loss = 0.0
             num_correct = 0.0
             num_total = 0.0
             model.train()
@@ -120,67 +118,94 @@ class GDTrainer(Trainer):
                 batch_x = batch_x.to(self.device)
 
                 if nn_data_setting.use_cnn_features:
-                    batch_x = cnn_features.prepare_feature_vector(batch_x, cnn_features_setting=cnn_features_setting)
+                    batch_x = cnn_features.prepare_feature_vector(
+                        batch_x, cnn_features_setting=cnn_features_setting
+                    )
 
                 batch_y = batch_y.unsqueeze(1).type(torch.float32).to(self.device)
 
-                batch_out, batch_loss = forward_and_loss_fn(model, criterion, batch_x, batch_y, use_cuda=use_cuda)
-                batch_pred = (torch.sigmoid(batch_out) + .5).int()
+                batch_out, batch_loss = forward_and_loss_fn(
+                    model, criterion, batch_x, batch_y, use_cuda=use_cuda
+                )
+                batch_pred = (torch.sigmoid(batch_out) + 0.5).int()
                 num_correct += (batch_pred == batch_y.int()).sum(dim=0).item()
-
-                running_loss += (batch_loss.item() * batch_size)
+                running_loss += batch_loss.item() * batch_size
 
                 if i % 100 == 0:
                     LOGGER.info(
-                         f"[Epoch {epoch:04d}] [Step {i:05d}] | Loss: {running_loss / num_total:.4f} | Acc: {num_correct / num_total * 100:.2f}%")
+                        f"[Epoch {epoch:04d}] [Step {i:05d}] | Loss: {running_loss / num_total:.4f} | Acc: {num_correct / num_total * 100:.2f}%"
+                    )
 
                 optim.zero_grad()
                 batch_loss.backward()
                 optim.step()
 
             running_loss /= num_total
-            train_accuracy = (num_correct/num_total)*100
-
-            LOGGER.info(f"Epoch [{epoch+1}/{self.epochs}]: train/{logging_prefix}__loss: {running_loss}, train/{logging_prefix}__accuracy: {train_accuracy}")
+            train_accuracy = (num_correct / num_total) * 100
+            LOGGER.info(
+                f"Epoch [{epoch+1}/{self.epochs}]: train/{logging_prefix}__loss: {running_loss}, train/{logging_prefix}__accuracy: {train_accuracy}"
+            )
             torch.cuda.empty_cache()
 
+            # ── Evaluation ──────────────────────────────────────────────
             test_running_loss = 0.0
             num_correct = 0.0
             num_total = 0.0
             model.eval()
+
             with torch.no_grad():
                 for batch_x, _, batch_y in test_loader:
-    
                     batch_size = batch_x.size(0)
                     num_total += batch_size
                     batch_x = batch_x.to(self.device)
-    
+
                     if nn_data_setting.use_cnn_features:
-                        batch_x = cnn_features.prepare_feature_vector(batch_x, cnn_features_setting=cnn_features_setting)
-    
+                        batch_x = cnn_features.prepare_feature_vector(
+                            batch_x, cnn_features_setting=cnn_features_setting
+                        )
+
                     batch_y = batch_y.unsqueeze(1).type(torch.float32).to(self.device)
                     batch_out = model(batch_x)
                     batch_loss = criterion(batch_out, batch_y)
-    
-                    test_running_loss += (batch_loss.item() * batch_size)
-    
-                    batch_pred = (torch.sigmoid(batch_out) + .5).int()
+
+                    test_running_loss += batch_loss.item() * batch_size
+                    batch_pred = (torch.sigmoid(batch_out) + 0.5).int()
                     num_correct += (batch_pred == batch_y.int()).sum(dim=0).item()
-    
-                if num_total == 0:
-                    num_total = 1
-    
-                test_running_loss /= num_total
-                test_acc = 100 * (num_correct / num_total)
-                LOGGER.info(f"Epoch [{epoch+1}/{self.epochs}]: test/{logging_prefix}__loss: {test_running_loss}, test/{logging_prefix}__accuracy: {test_acc}")
 
+            # ── Post-eval: OUTSIDE with block, runs every epoch ─────────
+            if num_total == 0:
+                num_total = 1
 
-                if best_model is None or test_acc > best_acc:
-                    best_acc = test_acc
-                    best_model = deepcopy(model.state_dict())
-    
-                LOGGER.info(
-                    f"[{epoch:04d}]: {running_loss} -- train acc: {train_accuracy} -- test_acc: {test_acc}")
+            test_running_loss /= num_total
+            test_acc = 100 * (num_correct / num_total)
+
+            LOGGER.info(
+                f"Epoch [{epoch+1}/{self.epochs}]: test/{logging_prefix}__loss: {test_running_loss}, test/{logging_prefix}__accuracy: {test_acc}"
+            )
+
+            if best_model is None or test_acc > best_acc:
+                best_acc = test_acc
+                best_model = deepcopy(model.state_dict())
+
+                if checkpoint_dir is not None:
+                    os.makedirs(checkpoint_dir, exist_ok=True)
+                    torch.save(
+                        {
+                            "epoch": epoch,
+                            "model_state_dict": model.state_dict(),
+                            "optimizer_state_dict": optim.state_dict(),
+                            "best_acc": best_acc,
+                            "val_loss": test_running_loss,
+                        },
+                        os.path.join(checkpoint_dir, "best_checkpoint.pth"),
+                    )
+                    LOGGER.info(
+                        f"New best checkpoint saved at epoch {epoch+1} with val_acc={best_acc:.4f}"
+                    )
+
+            LOGGER.info(
+                f"[{epoch:04d}]: {running_loss} -- train acc: {train_accuracy} -- test_acc: {test_acc}"
+            )
 
         model.load_state_dict(best_model)
         return model

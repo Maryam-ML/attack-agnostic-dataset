@@ -3,16 +3,14 @@ import logging
 import sys
 import time
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 import torch
 import yaml
 
 from dfadetect.agnostic_datasets.attack_agnostic_dataset import AttackAgnosticDataset
 from dfadetect.cnn_features import CNNFeaturesSetting
-#from dfadetect.datasets import apply_feature_and_double_delta, lfcc, mfcc
 from dfadetect.models import models
-#from dfadetect.models.gaussian_mixture_model import GMMDescent, flatten_dataset
 from dfadetect.trainer import GDTrainer, NNDataSetting
 from dfadetect.utils import set_seed
 from experiment_config import feature_kwargs
@@ -22,19 +20,11 @@ LOGGER = logging.getLogger()
 
 def init_logger(log_file):
     LOGGER.setLevel(logging.INFO)
-
-    # create file handler
     fh = logging.FileHandler(log_file)
-
-    # # create console handler
     ch = logging.StreamHandler()
-
-    # # create formatter and add it to the handlers
-    formatter = logging.Formatter(
-        '%(asctime)s - %(levelname)s - %(message)s')
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     fh.setFormatter(formatter)
     ch.setFormatter(formatter)
-    # add the handlers to the logger
     LOGGER.addHandler(fh)
     LOGGER.addHandler(ch)
 
@@ -56,6 +46,8 @@ def train_nn(
     device: str,
     model_config: Dict,
     cnn_features_setting: CNNFeaturesSetting,
+    oversample: bool = False,
+    undersample: bool = False,
     model_dir: Optional[Path] = None,
     amount_to_use: Optional[int] = None,
 ) -> None:
@@ -66,9 +58,7 @@ def train_nn(
 
     use_cnn_features = False if model_name == "rawnet" else True
 
-    nn_data_setting = NNDataSetting(
-        use_cnn_features=use_cnn_features,
-    )
+    nn_data_setting = NNDataSetting(use_cnn_features=use_cnn_features)
     timestamp = time.time()
     folds_number = 3
 
@@ -80,8 +70,8 @@ def train_nn(
             fold_num=fold,
             fold_subset="train",
             reduced_number=amount_to_use,
-            oversample=True, 
-            undersample=False,
+            oversample=oversample,
+            undersample=undersample,
         )
 
         data_test = AttackAgnosticDataset(
@@ -89,17 +79,39 @@ def train_nn(
             wavefake_path=datasets_paths[1],
             fakeavceleb_path=datasets_paths[2],
             fold_num=fold,
-            fold_subset="test",
+            fold_subset="val",
             reduced_number=amount_to_use,
-            oversample=False,
+        )
+
+        train_label_counts = data_train.samples["label"].value_counts()
+        test_label_counts  = data_test.samples["label"].value_counts()
+        train_bonafide = train_label_counts.get("bonafide", 0)
+        train_spoof    = train_label_counts.get("spoof",    0)
+        test_bonafide  = test_label_counts.get("bonafide",  0)
+        test_spoof     = test_label_counts.get("spoof",     0)
+
+        LOGGER.info(
+            f"\n{'='*60}\n"
+            f"  Fold {fold} — Dataset Statistics\n"
+            f"{'='*60}\n"
+            f"  TRAIN              → total: {train_bonafide + train_spoof:>7,}  "
+            f"| bonafide: {train_bonafide:>6,}  | spoof: {train_spoof:>7,}\n"
+            f"  Validation(TEST)   → total: {test_bonafide  + test_spoof:>7,}  "
+            f"| bonafide: {test_bonafide:>6,}  | spoof: {test_spoof:>7,}\n"
+            f"             Spoof ratio train:   {train_spoof / max(train_bonafide, 1):.2f}:1  "
+            f"|   Spoof ratio test: {test_spoof / max(test_bonafide, 1):.2f}:1\n"
+            f"{'='*60}"
         )
 
         current_model = models.get_model(
             model_name=model_name, config=model_parameters, device=device,
         ).to(device)
 
-        LOGGER.info(f"Training '{model_name}' model on {len(data_train)} audio files.")
-        LOGGER.info(f"validation'{model_name}' model on {len(data_test)} audio files.") 
+        # define save_name once — reused for both best_checkpoint dir and ckpt.pth
+        save_name = f"aad__{model_name}_fold_{fold}__{timestamp}"
+        fold_ckpt_dir = None
+        if model_dir is not None:
+            fold_ckpt_dir = Path(model_dir) / save_name  # FIX: removed /fold_{fold}, same level as ckpt.pth
 
         current_model = GDTrainer(
             device=device,
@@ -113,10 +125,10 @@ def train_nn(
             nn_data_setting=nn_data_setting,
             logging_prefix=f"fold_{fold}",
             cnn_features_setting=cnn_features_setting,
+            checkpoint_dir=str(fold_ckpt_dir) if fold_ckpt_dir is not None else None,
         )
 
         if model_dir is not None:
-            save_name = f"aad__{model_name}_fold_{fold}__{timestamp}"
             save_model(
                 model=current_model,
                 model_dir=model_dir,
@@ -135,7 +147,6 @@ def main(args):
         config = yaml.safe_load(f)
 
     seed = config["data"].get("seed", 42)
-    # fix all seeds
     set_seed(seed)
 
     if not args.cpu and torch.cuda.is_available():
@@ -162,8 +173,11 @@ def main(args):
             model_dir=model_dir,
             model_config=config["model"],
             cnn_features_setting=cnn_features_setting,
+            oversample=args.oversample,
+            undersample=args.undersample,
         )
     else:
+        # GMM path — uncomment imports at top if using this branch
         feature_fn = lfcc if args.lfcc else mfcc
         train_gmm(
             datasets_paths=[args.asv_path, args.wavefake_path, args.celeb_path],
@@ -174,7 +188,7 @@ def main(args):
             device=device,
             model_dir=model_dir,
             use_double_delta=True,
-            amount_to_use=args.amount
+            amount_to_use=args.amount,
         )
 
 
@@ -185,56 +199,39 @@ def parse_args():
     WAVEFAKE_DATASET_PATH = "../datasets/WaveFake"
     FAKEAVCELEB_DATASET_PATH = "../datasets/FakeAVCeleb/FakeAVCeleb_v1.2"
 
-    parser.add_argument(
-        "--asv_path", type=str, default=ASVSPOOF_DATASET_PATH, help="Path to ASVspoof2021 dataset directory",
-    )
-    parser.add_argument(
-        "--wavefake_path", type=str, default=WAVEFAKE_DATASET_PATH, help="Path to WaveFake dataset directory",
-    )
-    parser.add_argument(
-        "--celeb_path", type=str, default=FAKEAVCELEB_DATASET_PATH, help="Path to FakeAVCeleb dataset directory",
-    )
-
-    default_model_config = "config.yaml"
-    parser.add_argument(
-        "--config", help="Model config file path (default: config.yaml)", type=str, default=default_model_config
-    )
-
-    default_amount = None
-    parser.add_argument(
-        "--amount", "-a", help=f"Amount of files to load - useful when debugging (default: {default_amount} - use all).", type=int, default=default_amount
-    )
-
-    default_batch_size = 128
-    parser.add_argument(
-        "--batch_size", "-b", help=f"Batch size (default: {default_batch_size}).", type=int, default=default_batch_size)
-
-    default_epochs = 5
-    parser.add_argument(
-        "--epochs", "-e", help=f"Epochs (default: {default_epochs}).", type=int, default=default_epochs)
-
-    default_model_dir = "trained_models"
-    parser.add_argument(
-        "--ckpt", help=f"Checkpoint directory (default: {default_model_dir}).", type=str, default=default_model_dir)
-
-    parser.add_argument(
-        "--cpu", "-c", help="Force using cpu?", action="store_true")
-
-    parser.add_argument(
-        "--verbose", "-v", help="Display debug information?", action="store_true")
+    parser.add_argument("--asv_path", type=str, default=ASVSPOOF_DATASET_PATH,
+                        help="Path to ASVspoof2021 dataset directory")
+    parser.add_argument("--wavefake_path", type=str, default=WAVEFAKE_DATASET_PATH,
+                        help="Path to WaveFake dataset directory")
+    parser.add_argument("--celeb_path", type=str, default=FAKEAVCELEB_DATASET_PATH,
+                        help="Path to FakeAVCeleb dataset directory")
+    parser.add_argument("--config", type=str, default="config.yaml",
+                        help="Model config file path (default: config.yaml)")
+    parser.add_argument("--amount", "-a", type=int, default=None,
+                        help="Amount of files to load - useful when debugging (default: None - use all)")
+    parser.add_argument("--batch_size", "-b", type=int, default=128,
+                        help="Batch size (default: 128)")
+    parser.add_argument("--epochs", "-e", type=int, default=5,
+                        help="Epochs (default: 5)")
+    parser.add_argument("--ckpt", type=str, default="trained_models",
+                        help="Checkpoint directory (default: trained_models)")
+    parser.add_argument("--cpu", "-c", action="store_true",
+                        help="Force using cpu?")
+    parser.add_argument("--verbose", "-v", action="store_true",
+                        help="Display debug information?")
+    parser.add_argument("--oversample", action=argparse.BooleanOptionalAction, default=True,
+                        help="Oversample bonafide class to match spoof count?")
+    parser.add_argument("--undersample", action=argparse.BooleanOptionalAction, default=False,
+                        help="Undersample spoof class to match bonafide count?")
 
     # GMM arguments
-    parser.add_argument(
-        "--use_gmm", help="[GMM] Use to train GMM, otherwise - NNs", action="store_true"
-    )
+    parser.add_argument("--use_gmm", action="store_true",
+                        help="Use to train GMM, otherwise NNs")
+    parser.add_argument("--clusters", "-k", type=int, default=128,
+                        help="[GMM] The amount of clusters to learn (default: 128)")
+    parser.add_argument("--lfcc", "-l", action="store_true",
+                        help="[GMM] Use LFCC instead of MFCC?")
 
-    default_k = 128
-    parser.add_argument(
-        "--clusters", "-k", help=f"[GMM] The amount of clusters to learn (default: {default_k}).", type=int, default=default_k)
-
-    parser.add_argument(
-        "--lfcc", "-l", help="[GMM] Use LFCC instead of MFCC?", action="store_true"
-    )
     return parser.parse_args()
 
 
