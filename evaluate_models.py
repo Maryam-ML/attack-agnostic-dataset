@@ -122,7 +122,7 @@ def evaluate_nn(
         )
         print(f"\nTest Fold [{fold+1}/3]:")
         test_loader = DataLoader(
-            data_val, batch_size=batch_size, drop_last=True, num_workers=3)
+            data_val, batch_size=batch_size, drop_last=False, num_workers=4)
 
         num_correct = 0.0
         num_total   = 0.0
