@@ -105,12 +105,7 @@ class FakeAVCelebDataset(SimpleAudioFakeDataset):
 
 
     def get_file_path(self, sample):
-            """
-            sample['audio_path'] example:
-              'FakeAVCeleb/FakeVideo-FakeAudio/African/men/id00076/00109_10_id00476_wavtolip.flac'
-            We want:
-              '/kaggle/input/datasets/mrquadian/fakeavceleb/FakeVideo-FakeAudio/African/men/id00076/...flac'
-            """
+           
             rel = sample["audio_path"]
     
             # If audio_path starts with 'FakeAVCeleb/', drop that part
