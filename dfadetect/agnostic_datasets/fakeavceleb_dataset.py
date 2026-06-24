@@ -13,20 +13,6 @@ FAKEAVCELEB_KFOLD_SPLIT = {
         "val": ['wav2lip'],
         "bonafide_partition": [0.7, 0.15],
         "seed": 42
-    },
-    1: {
-        "train": ['fsgan-wav2lip', 'wav2lip'],
-        "test": ['rtvc'],
-        "val": ['faceswap-wav2lip'],
-        "bonafide_partition": [0.7, 0.15],
-        "seed": 43
-    },
-    2: {
-        "train": ['faceswap-wav2lip', 'fsgan-wav2lip'],
-        "test": ['wav2lip'],
-        "val": ['rtvc'],
-        "bonafide_partition": [0.7, 0.15],
-        "seed": 44
     }
 }
 

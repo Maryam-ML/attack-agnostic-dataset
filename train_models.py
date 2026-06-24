@@ -60,7 +60,7 @@ def train_nn(
 
     nn_data_setting = NNDataSetting(use_cnn_features=use_cnn_features)
     timestamp = time.time()
-    folds_number = 3
+    folds_number = 1
 
     for fold in range(folds_number):
         data_train = AttackAgnosticDataset(
@@ -79,7 +79,7 @@ def train_nn(
             wavefake_path=datasets_paths[1],
             fakeavceleb_path=datasets_paths[2],
             fold_num=fold,
-            fold_subset="val",
+            fold_subset="test",
             reduced_number=amount_to_use,
         )
 
