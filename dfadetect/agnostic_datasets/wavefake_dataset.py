@@ -7,13 +7,13 @@ from dfadetect.agnostic_datasets.base_dataset import SimpleAudioFakeDataset
 
 WAVEFAKE_KFOLD_SPLIT = {
    
-    0:  {
-        "train": ['melgan_large', 'waveglow', 'full_band_melgan', 'melgan', 'hifiGAN'],
-        "test": ['multi_band_melgan'],
-        "val": ['parallel_wavegan'],
+    0: {
+        "train": ['A03', 'A04', 'A05', 'A06', 'A11', 'A12', 'A13', 'A14', 'A15', 'A16', 'A17', 'A18', 'A19'],
+        "test": ['A01', 'A07', 'A08'],
+        "val": ['A02', 'A09', 'A10'],
         "bonafide_partition": [0.7, 0.15],
-        "seed": 42
-    },
+        "seed": 44
+    }
 }
 
 
