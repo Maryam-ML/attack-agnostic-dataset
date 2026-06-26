@@ -9,11 +9,11 @@ from dfadetect.agnostic_datasets.base_dataset import SimpleAudioFakeDataset
 FAKEAVCELEB_KFOLD_SPLIT = {
     
     0: {
-        "train": ['faceswap-wav2lip', 'fsgan-wav2lip'],
-        "test": ['wav2lip'],
-        "val": ['rtvc'],
+        "train": ['fsgan-wav2lip', 'wav2lip'],
+        "test": ['rtvc'],
+        "val": ['faceswap-wav2lip'],
         "bonafide_partition": [0.7, 0.15],
-        "seed": 44
+        "seed": 43
     }
 }
 
