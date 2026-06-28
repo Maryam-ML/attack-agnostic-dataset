@@ -1,6 +1,6 @@
 %%writefile /kaggle/working/attack-agnostic-dataset/evaluate_models.py
 #original correct code
-# here the plot of roc is correct and best to use 
+# here the plot of roc is correct and best to use #cpoied
 import argparse
 import json
 import logging
@@ -100,11 +100,11 @@ def evaluate_nn(
     )
 
     weights_path = ''
-    for fold in tqdm.tqdm(range(3)):
+    for fold in tqdm.tqdm(range(1)):
         model = models.get_model(
             model_name=model_name, config=model_parameters, device=device)
-        if len(model_paths) > 1:
-            assert len(model_paths) == 3, "Pass either 0 or 3 weights path"
+        if len(model_paths) >= 1:
+            #assert len(model_paths) == 3, "Pass either 0 or 3 weights path"
             weights_path = model_paths[fold]
             model.load_state_dict(torch.load(weights_path))
         model = model.to(device)
@@ -112,8 +112,8 @@ def evaluate_nn(
         logging_prefix = f"fold_{fold}"
         data_val = AttackAgnosticDataset(
             asvspoof_path=datasets_paths[0],
-            #wavefake_path=datasets_paths[1],
-            #fakeavceleb_path=datasets_paths[2],
+            wavefake_path=datasets_paths[1],
+            fakeavceleb_path=datasets_paths[2],
             fold_num=fold,
             fold_subset="val",
             reduced_number=amount_to_use,
