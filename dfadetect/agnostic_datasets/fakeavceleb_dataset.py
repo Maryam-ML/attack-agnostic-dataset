@@ -16,7 +16,7 @@ FAKEAVCELEB_KFOLD_SPLIT = {
         "seed": 44
     }
 }
-}
+
 
 
 class FakeAVCelebDataset(SimpleAudioFakeDataset):
