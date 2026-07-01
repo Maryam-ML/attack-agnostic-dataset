@@ -96,6 +96,7 @@ class LCNN(torch_nn.Module):
 
     def __init__(self, **kwargs):
         super().__init__()
+        dropout         = kwargs.get("dropout", 0.4)
         input_channels = kwargs.get("input_channels", 3)
         num_coefficients = kwargs.get("num_coefficients", 80)
 
@@ -160,7 +161,7 @@ class LCNN(torch_nn.Module):
 
             torch_nn.MaxPool2d((2, 2), (2, 2)),
 
-            torch_nn.Dropout(0.7),
+            torch_nn.Dropout(dropout),
         )
 
         # After 4 MaxPool2d (2x2) operations, frequency dimension is /16.
@@ -212,7 +213,11 @@ class LCNN(torch_nn.Module):
 
 if __name__ == "__main__":
     print("Definition of LCNN_SE model")
-    model = LCNN(input_channels=3, num_coefficients=80)
+    model = LCNN(
+    input_channels=3, 
+    num_coefficients=80,
+    dropout=0.4, 
+    )
     batch_size = 12
     mock_input = torch.rand((batch_size, 3, 80, 404))
     output = model(mock_input)
