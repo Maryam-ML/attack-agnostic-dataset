@@ -13,7 +13,9 @@ model:
   name: "lcnn"
   parameters:
     input_channels: 1
+    num_coefficients: 80
     dropout: 0.4
   optimizer:
     lr: 0.0001
+    weight_decay: 0.0001
   

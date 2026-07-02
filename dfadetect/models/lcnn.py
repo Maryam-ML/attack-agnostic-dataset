@@ -64,7 +64,6 @@ class MaxFeatureMap2D(torch_nn.Module):
         m, _ = inputs.view(*shape).max(self.max_dim)
         return m
 
-
 class SEBlock(torch_nn.Module):
     """Lightweight Squeeze-and-Excitation block for channel attention."""
 
@@ -83,8 +82,6 @@ class SEBlock(torch_nn.Module):
         y = self.avg_pool(x).view(b, c)
         y = self.fc(y).view(b, c, 1, 1)
         return x * y
-
-
 # ----------------- LCNN + SE model ----------------- #
 
 class LCNN(torch_nn.Module):
