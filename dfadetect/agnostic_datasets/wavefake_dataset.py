@@ -31,9 +31,6 @@ WAVEFAKE_KFOLD_SPLIT = {
 }
 
 
-
-
-
 class WaveFakeDataset(SimpleAudioFakeDataset):
 
     fake_data_path = "generated_audio"

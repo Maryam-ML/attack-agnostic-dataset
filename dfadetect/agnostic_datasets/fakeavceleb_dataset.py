@@ -32,8 +32,6 @@ FAKEAVCELEB_KFOLD_SPLIT = {
 }
 
 
-
-
 class FakeAVCelebDataset(SimpleAudioFakeDataset):
 
     # FIX 1: Removed the leading space from audio_folder.
