@@ -1,4 +1,6 @@
-#%%writefile /kaggle/working/attackdeepfake/evaluate_models_correct.py
+%%writefile /kaggle/working/attack-agnostic-dataset/evaluate_models.py
+#original correct code
+# here the plot of roc is correct and best to use #cpoied
 import argparse
 import json
 import logging
@@ -98,20 +100,20 @@ def evaluate_nn(
     )
 
     weights_path = ''
-    for fold in tqdm.tqdm(range(3)):
+    for fold in tqdm.tqdm(range(1)):
         model = models.get_model(
             model_name=model_name, config=model_parameters, device=device)
-        if len(model_paths) > 1:
-            assert len(model_paths) == 3, "Pass either 0 or 3 weights path"
+        if len(model_paths) >= 1:
+            #assert len(model_paths) == 3, "Pass either 0 or 3 weights path"
             weights_path = model_paths[fold]
             model.load_state_dict(torch.load(weights_path))
         model = model.to(device)
 
         logging_prefix = f"fold_{fold}"
         data_val = AttackAgnosticDataset(
-            #asvspoof_path=datasets_paths[0],
+            asvspoof_path=datasets_paths[0],
             wavefake_path=datasets_paths[1],
-            #fakeavceleb_path=datasets_paths[2],
+            fakeavceleb_path=datasets_paths[2],
             fold_num=fold,
             fold_subset="val",
             reduced_number=amount_to_use,
@@ -169,7 +171,7 @@ def evaluate_nn(
         thresh, eer, fpr, tpr, thresholds = calculate_eer(y_np, y_score_np)
 
         LOGGER.info(
-            f"eval/{logging_prefix}__eer: {eer:.4f}, "
+            f"eval/{logging_prefix}__eer: {eer:.2%}, "
             f"eval/{logging_prefix}__accuracy: {eval_accuracy:.4f}, "
             f"eval/{logging_prefix}__precision: {precision:.4f}, "
             f"eval/{logging_prefix}__recall: {recall:.4f}, "
@@ -179,7 +181,7 @@ def evaluate_nn(
         print(
             f"  ✅ Fold {fold} done — "
             f"Accuracy: {eval_accuracy:.2f}%, "
-            f"EER: {eer:.4f}, "
+            f"EER: {eer:.2%}, "
             f"AUC: {auc_score:.4f}"
         )
 
@@ -216,30 +218,64 @@ def evaluate_nn(
         print(f"  📊 Confusion matrix saved → confusion_matrix_fold_{fold}.png")
 
         # ── ROC CURVE ─────────────────────────────────────────────────────────
-        # ✅ FIX 3: Reuse the same fpr/tpr from calculate_eer (no 2nd roc_curve call)
+        # ✅ STYLE UPDATE: plot ROC like the attached reference image
+        # - blue ROC curve
+        # - gray dashed random line
+        # - light grid
+        # - title includes fold number and EER
+        # - legend shows only AUC and Random
+        # - no EER red dot
         roc_auc = auc(fpr, tpr)
 
-        fig_roc, ax_roc = plt.subplots(figsize=(6, 5))
-        ax_roc.plot(fpr, tpr, color='darkorange', lw=2,
-                    label=f'ROC curve (AUC = {roc_auc:.4f})')
-        ax_roc.plot([0, 1], [0, 1], color='navy', lw=1.5, linestyle='--',
-                    label='Random classifier')
-        ax_roc.scatter(
-            [eer], [1 - eer], color='red', zorder=5,
-            label=f'EER point ({eer:.4f})'
-        )
-        ax_roc.set_xlim([0.0, 1.0])
-        ax_roc.set_ylim([0.0, 1.05])
-        ax_roc.set_xlabel('False Positive Rate')
-        ax_roc.set_ylabel('True Positive Rate')
-        ax_roc.set_title(f'ROC Curve — Fold {fold + 1}')
-        ax_roc.legend(loc='lower right')
-        fig_roc.tight_layout()
+        with plt.style.context("seaborn-v0_8-whitegrid"):
+            fig_roc, ax_roc = plt.subplots(figsize=(7, 6))
+
+            # Main ROC curve (blue)
+            ax_roc.plot(
+                fpr, tpr,
+                color="#1f77b4",
+                lw=2.2,
+                label=f"AUC = {roc_auc:.4f}"
+            )
+
+            # Random classifier line (gray dashed)
+            ax_roc.plot(
+                [0, 1], [0, 1],
+                color="gray",
+                lw=1.6,
+                linestyle="--",
+                label="Random"
+            )
+
+            # Match reference layout and limits
+            ax_roc.set_xlim([-0.05, 1.05])
+            ax_roc.set_ylim([-0.05, 1.05])
+
+            ax_roc.set_xlabel("False Positive Rate", fontsize=14)
+            ax_roc.set_ylabel("True Positive Rate", fontsize=14)
+            ax_roc.set_title(
+                f"ROC Curve - Fold {fold} (EER={eer:.2%})",
+                fontsize=16
+            )
+
+            # Grid and ticks like reference
+            ax_roc.grid(True, color="#b0b0b0", alpha=0.4, linewidth=1.0)
+            ax_roc.tick_params(axis="both", labelsize=12)
+
+            # Legend inside lower-right
+            ax_roc.legend(
+                loc="lower right",
+                fontsize=12,
+                frameon=True,
+                framealpha=0.9
+            )
+
+            fig_roc.tight_layout()
+
         roc_path = f"/kaggle/working/roc_curve_fold_{fold}.png"
         plt.savefig(roc_path, dpi=150)
         plt.show()
         print(f"  📈 ROC curve saved → roc_curve_fold_{fold}.png")
-
 
 
 def main(args):
@@ -298,4 +334,4 @@ def parse_args():
 
 
 if __name__ == "__main__":
-    main(parse_args())
+    main(parse_args()) 
