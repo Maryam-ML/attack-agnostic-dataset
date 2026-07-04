@@ -1,17 +1,22 @@
 data:
   seed: 42
   cnn_features_setting:
-    frontend_algorithm: ["lfcc"]  # ["mfcc"] or ["lfcc"] or ["mfcc", "lfcc"]
+    frontend_algorithm: ["lfcc"]   # keep LFCC front-end, no change needed
     use_spectrogram: False
 
 checkpoint:
   paths: []
 
 model:
-  name: "lcnn"
+  name: "lcnn_cbam"
   parameters:
     input_channels: 1
-    use_spec_augment: False
-    use_checkpoint: False
+    num_coefficients: 80
+    dropout: 0.5              # increased from 0.4
+    cbam_reduction: 8          # channel attention bottleneck ratio
+    cbam_kernel: 5             # reduced from default 7 for 80-band LFCC
   optimizer:
-    lr: 0.0001
+    lr: 0.0003                # increased from 0.0001
+    weight_decay: 0.0002       # increased from 0.0001
+
+ 
