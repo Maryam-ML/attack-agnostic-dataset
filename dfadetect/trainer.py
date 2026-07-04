@@ -5,13 +5,17 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Callable, List, Optional
 
+
 import torch
 from torch.utils.data import DataLoader
-from torch.cuda.amp import autocast, GradScaler
+from torch.amp import autocast, GradScaler  # CHANGED: moved from torch.cuda.amp to torch.amp
+
 
 from dfadetect import cnn_features
 
+
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -92,7 +96,7 @@ class GDTrainer(Trainer):
         )
 
         use_amp = self.device != "cpu" and torch.cuda.is_available()
-        scaler = GradScaler(enabled=use_amp)
+        scaler = GradScaler(device="cuda", enabled=use_amp)  # CHANGED: added device="cuda" arg per new torch.amp API
 
         best_model = None
         best_val_loss = float("inf")
@@ -121,7 +125,7 @@ class GDTrainer(Trainer):
 
                 optim.zero_grad(set_to_none=True)
 
-                with autocast(enabled=use_amp):
+                with autocast(device_type="cuda", enabled=use_amp):  # CHANGED: added device_type="cuda" per new torch.amp API
                     batch_out, batch_loss = forward_and_loss(model, criterion, batch_x, batch_y)
 
                 scaler.scale(batch_loss).backward()
@@ -165,7 +169,7 @@ class GDTrainer(Trainer):
                             batch_x, cnn_features_setting=cnn_features_setting
                         )
 
-                    with autocast(enabled=use_amp):
+                    with autocast(device_type="cuda", enabled=use_amp):  # CHANGED: added device_type="cuda" per new torch.amp API
                         batch_out = model(batch_x)
                         batch_loss = criterion(batch_out, batch_y)
 
