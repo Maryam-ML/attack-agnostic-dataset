@@ -104,7 +104,7 @@ def evaluate_nn(
         model = models.get_model(
             model_name=model_name, config=model_parameters, device=device)
         if len(model_paths) >= 1:
-            #assert len(model_paths) == 3, "Pass either 0 or 3 weights path"
+            assert len(model_paths) == 3, "Pass either 0 or 3 weights path"
             weights_path = model_paths[fold]
             model.load_state_dict(torch.load(weights_path))
         model = model.to(device)
