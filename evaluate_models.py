@@ -192,7 +192,7 @@ def evaluate_nn(
         im = ax_cm.imshow(cm, interpolation='nearest', cmap='Blues')
         fig_cm.colorbar(im, ax=ax_cm)
 
-        classes   = ['Fake (0)', 'Bonafide (1)']
+        classes   = ['Spoof (0)', 'Bonafide (1)']
         tick_marks = np.arange(len(classes))
         ax_cm.set_xticks(tick_marks)
         ax_cm.set_xticklabels(classes, rotation=45, ha='right')
