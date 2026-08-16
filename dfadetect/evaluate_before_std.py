@@ -1,5 +1,5 @@
 %%writefile /kaggle/working/attack-agnostic-dataset/evaluate_models.py
-#original correct code
+#original correct code      # evaluation code used 
 # here the plot of roc is correct and best to use #cpoied
 import argparse
 import json
@@ -73,7 +73,7 @@ def calculate_eer(
     y_score: sigmoid probabilities (higher → more bonafide)
     Returns thresh, eer, fpr, tpr, thresholds
     """
-    fpr, tpr, thresholds = roc_curve(y_true, y_score, pos_label=1)
+    fpr, tpr, thresholds = roc_curve(y_true, y_score, pos_label=0)
     eer = brentq(lambda x: 1. - x - interp1d(fpr, tpr)(x), 0., 1.)
     thresh = float(interp1d(fpr, thresholds)(eer))
     return thresh, eer, fpr, tpr, thresholds
@@ -162,13 +162,13 @@ def evaluate_nn(
         eval_accuracy = (num_correct / num_total) * 100
 
         precision, recall, f1_score, _ = precision_recall_fscore_support(
-            y_int_np, y_label_int_np, average="binary", beta=1.0)
+            y_int_np, y_label_int_np, average="binary", pos_label=0, beta=1.0)
 
         # ✅ FIX 1: AUC uses soft probabilities, not hard binary labels
-        auc_score = roc_auc_score(y_true=y_np, y_score=y_score_np)
+        auc_score = roc_auc_score(y_true=1 - y_np, y_score=1 - y_score_np)
 
-        # ✅ FIX 2: EER uses same convention as ROC plot (bonafide=positive)
-        thresh, eer, fpr, tpr, thresholds = calculate_eer(y_np, y_score_np)
+        # EER uses spoof=positive convention (pos_label=0)
+        thresh, eer, fpr, tpr, thresholds = calculate_eer(y_np,1 -  y_score_np)
 
         LOGGER.info(
             f"eval/{logging_prefix}__eer: {eer:.2%}, "
@@ -186,13 +186,13 @@ def evaluate_nn(
         )
 
         # ── CONFUSION MATRIX ──────────────────────────────────────────────────
-        cm = confusion_matrix(y_int_np, y_label_int_np)
+        cm = confusion_matrix(y_int_np, y_label_int_np,labels=[0,1])
 
         fig_cm, ax_cm = plt.subplots(figsize=(5, 4))
         im = ax_cm.imshow(cm, interpolation='nearest', cmap='Blues')
         fig_cm.colorbar(im, ax=ax_cm)
 
-        classes   = ['Fake (0)', 'Bonafide (1)']
+        classes   = ['Spoof','Bonafide']
         tick_marks = np.arange(len(classes))
         ax_cm.set_xticks(tick_marks)
         ax_cm.set_xticklabels(classes, rotation=45, ha='right')
