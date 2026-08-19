@@ -146,7 +146,7 @@ def main(args):
     with open(args.config, "r") as f:
         config = yaml.safe_load(f)
 
-    seed = config["data"].get("seed", 42)
+    training_seed = config["data"].get("seed", 42)
     print(f"🔑 Training seed in use: {training_seed}")   # <-- added line
     set_seed(training_seed)
 
