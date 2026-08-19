@@ -27,7 +27,7 @@ from dfadetect.cnn_features import CNNFeaturesSetting
 from dfadetect.models import models
 from dfadetect.trainer import NNDataSetting
 from dfadetect.utils import set_seed
-from experiment_config import feature_kwargs
+#from experiment_config import feature_kwargs
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
