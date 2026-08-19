@@ -14,7 +14,7 @@ FAKEAVCELEB_KFOLD_SPLIT = {
         "bonafide_partition": [0.7, 0.15],
         "seed": 42
     }
-    
+
 }
 
 class FakeAVCelebDataset(SimpleAudioFakeDataset):

@@ -147,7 +147,8 @@ def main(args):
         config = yaml.safe_load(f)
 
     seed = config["data"].get("seed", 42)
-    set_seed(seed)
+    print(f"🔑 Training seed in use: {training_seed}")   # <-- added line
+    set_seed(training_seed)
 
     if not args.cpu and torch.cuda.is_available():
         device = "cuda"

@@ -8,9 +8,9 @@ from dfadetect.agnostic_datasets.base_dataset import SimpleAudioFakeDataset
 
 ASVSPOOF_KFOLD_SPLIT = {
     0: {
-        "train": ['A01', 'A02', 'A03', 'A04', 'A07', 'A08', 'A09', 'A10', 'A11', 'A12', 'A13', 'A14', 'A19'],
-        "test": ['A05', 'A15', 'A16'],
-        "val": ['A06', 'A17', 'A18'],
+        "train": ['melgan_large', 'waveglow', 'full_band_melgan', 'melgan', 'hifiGAN'],
+        "test": ['multi_band_melgan'],
+        "val": ['parallel_wavegan'],
         "bonafide_partition": [0.7, 0.15],
         "seed": 42
     }
